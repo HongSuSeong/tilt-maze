@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#14161c">
+<title>기울기 시험판</title>
+<style>
+/* throwaway spike: how tilting a phone flat should feel. One board, one ball, a few walls, one breakable wall, one hole. */
+:root {
+  --bg: #14161c; --board: #232733; --grid: #2c3140; --wall: #6b7488; --wall-top: #8d97ad;
+  --crack: #c98a4b; --hole: #07080b; --fg: #e9ecf3; --mute: #8a91a3; --accent: #ffcf5a;
+  --panel: rgba(20, 22, 28, .94); --line: #343a4a;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden; overscroll-behavior: none;
+  font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hud { position: fixed; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top, 0px) + 10px) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; pointer-events: none; font-size: 13px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.hud b { color: var(--fg); font-weight: 600; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px) max(16px, env(safe-area-inset-left, 0px));
+  display: flex; gap: 10px; justify-content: center; }
+button { font: inherit; color: var(--fg); background: #2a2f3c; border: 1px solid var(--line); border-radius: 14px; min-height: 48px; padding: 0 18px; font-weight: 600; }
+button:active { transform: scale(.96); background: #333949; }
+button.main { background: var(--accent); color: #1a1406; border-color: transparent; }
+.cover { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(10, 11, 15, .82); padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
+.cover .card { max-width: 340px; text-align: center; display: grid; gap: 14px; }
+.cover h1 { margin: 0; font-size: 22px; text-wrap: balance; }
+.cover p { margin: 0; color: var(--mute); }
+.cover button { min-height: 56px; font-size: 17px; }
+.panel { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0;
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 16px) max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 14px; touch-action: pan-y; }
+.row { display: grid; grid-template-columns: 92px 1fr 52px; align-items: center; gap: 10px; }
+.row label { font-size: 14px; }
+.row output { text-align: right; font-variant-numeric: tabular-nums; color: var(--accent); }
+input[type=range] { width: 100%; height: 32px; accent-color: var(--accent); touch-action: pan-x; }
+.panel .btns { display: flex; gap: 10px; }
+.panel .btns button { flex: 1; }
+.note { font-size: 12px; color: var(--mute); margin: 0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud"><span id="state">센서 대기</span><span>깬 벽 <b id="broke">0</b> · 들어간 공 <b id="sunk">0</b></span></div>
+<div class="bar"><button id="zero">지금을 수평으로</button><button id="tune">손맛 조절</button></div>
+
+<div class="panel" id="panel" hidden>
+  <div class="row"><label for="sens">기울기 세기</label><input id="sens" type="range" min="0.2" max="2" step="0.05"><output id="sensV"></output></div>
+  <div class="row"><label for="fric">구름 저항</label><input id="fric" type="range" min="0" max="3" step="0.05"><output id="fricV"></output></div>
+  <div class="row"><label for="bounce">튕김</label><input id="bounce" type="range" min="0" max="0.9" step="0.05"><output id="bounceV"></output></div>
+  <div class="row"><label for="brk">벽 깨는 속도</label><input id="brk" type="range" min="100" max="900" step="10"><output id="brkV"></output></div>
+  <div class="row"><label for="dead">무시할 기울기</label><input id="dead" type="range" min="0" max="6" step="0.5"><output id="deadV"></output></div>
+  <p class="note">폰이 자꾸 가로로 돌아가면 제어 센터에서 화면 회전 잠금을 켜 주세요. 마음에 드는 값이 생기면 숫자를 알려 주세요.</p>
+  <div class="btns"><button id="reset">기본값</button><button id="close" class="main">닫기</button></div>
+</div>
+
+<div class="cover" id="cover">
+  <div class="card">
+    <h1>폰을 바닥과 수평으로 들어 주세요</h1>
+    <p>기울여서 공을 굴립니다. 빠르게 부딪히면 금 간 벽이 깨지고, 검은 구멍에 넣으면 아래로 떨어집니다.</p>
+    <button id="start" class="main">시작하기</button>
+    <p class="note" id="why"></p>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ---- the board, in board units: 100 wide, 160 tall (portrait) ----
+const BW = 100, BH = 160, R = 4.2;
+const WALLS = [   // [x, y, w, h], plus kind: 'crack' breaks when hit fast enough
+  [0, 0, 100, 3], [0, 157, 100, 3], [0, 0, 3, 160], [97, 0, 3, 160],   // the rim
+  [3, 40, 62, 4], [35, 80, 62, 4], [3, 120, 40, 4], [60, 120, 4, 37],
+  [65, 40, 32, 4, 'crack'], [43, 120, 17, 4, 'crack'],
+].map(([x, y, w, h, k]) => ({ x, y, w, h, k: k || 'wall', alive: true }));
+const HOLE = { x: 80, y: 140, r: 6.5 };
+const START = { x: 12, y: 15 };
+const DEF = { sens: 1, fric: 0.6, bounce: 0.35, brk: 330, dead: 1 };   // dead: degrees of tilt that do nothing, so a still hand stays still
+const U_PER_M = 400;   // a 25 cm board: 100 units are a quarter metre
+const G = 9.81 * U_PER_M * 5 / 7;   // a solid ball rolling down a slope accelerates at 5/7 g sin(angle)
+
+let S = { ...DEF };
+try { S = { ...DEF, ...JSON.parse(localStorage.getItem('tilt-spike') || '{}') }; } catch (e) {}
+const save = () => { try { localStorage.setItem('tilt-spike', JSON.stringify(S)); } catch (e) {} };
+
+const ball = { x: START.x, y: START.y, vx: 0, vy: 0, fall: 0, spin: 0 };
+let tilt = { x: 0, y: 0 }, raw = null, base = null, sensor = false, keys = {}, broke = 0, sunk = 0;
+const bits = [];   // pieces of broken walls
+
+// ---- the phone's tilt: beta front-back, gamma left-right; turned to match how the screen is rotated ----
+function onOrient(e) {
+  if (e.beta == null) return;
+  sensor = true;
+  raw = { b: e.beta, g: e.gamma };
+  if (!base) base = { ...raw };
+}
+function screenAngle() { return (screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0; }
+function readTilt() {
+  if (!raw || !base) { tilt.x = (keys.ArrowRight ? 8 : 0) - (keys.ArrowLeft ? 8 : 0); tilt.y = (keys.ArrowDown ? 8 : 0) - (keys.ArrowUp ? 8 : 0); return; }
+  let gx = raw.g - base.g, gy = raw.b - base.b;
+  const a = ((screenAngle() % 360) + 360) % 360;
+  if (a === 90) [gx, gy] = [gy, -gx]; else if (a === 270) [gx, gy] = [-gy, gx]; else if (a === 180) [gx, gy] = [-gx, -gy];
+  const dz = v => Math.sign(v) * Math.max(0, Math.abs(v) - S.dead);
+  // a little smoothing takes the jitter out of the sensor without making the ball feel late
+  tilt.x += (dz(gx) - tilt.x) * 0.5; tilt.y += (dz(gy) - tilt.y) * 0.5;
+}
+addEventListener('keydown', e => { keys[e.key] = true; });
+addEventListener('keyup', e => { keys[e.key] = false; });
+
+// ---- touch feedback: a knock you can hear, and on Android one you can feel ----
+let ac = null;
+function knock(speed) {
+  const k = Math.min(1, speed / 600);
+  if (k < 0.05) return;
+  if (navigator.vibrate) navigator.vibrate(Math.round(8 + 22 * k));
+  if (!ac) return;
+  const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(180 + 120 * k, t); o.frequency.exponentialRampToValueAtTime(60, t + 0.09);
+  g.gain.setValueAtTime(0.5 * k, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.13);
+}
+function crash() {
+  if (navigator.vibrate) navigator.vibrate([30, 20, 40]);
+  if (!ac) return;
+  const t = ac.currentTime, n = ac.sampleRate * 0.25, buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+  const s = ac.createBufferSource(), g = ac.createGain(); s.buffer = buf; g.gain.value = 0.6; s.connect(g).connect(ac.destination); s.start(t);
+}
+function plop() {
+  if (navigator.vibrate) navigator.vibrate(60);
+  if (!ac) return;
+  const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.setValueAtTime(520, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.35);
+  g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.42);
+}
+
+// ---- the ball ----
+function step(dt) {
+  readTilt();
+  if (ball.fall > 0) {   // dropping through the hole: shrink, then come back at the start
+    ball.fall += dt; ball.x += (HOLE.x - ball.x) * Math.min(1, dt * 10); ball.y += (HOLE.y - ball.y) * Math.min(1, dt * 10);
+    if (ball.fall > 0.9) Object.assign(ball, { x: START.x, y: START.y, vx: 0, vy: 0, fall: 0 });
+    return;
+  }
+  const rad = Math.PI / 180, ax = G * S.sens * Math.sin(tilt.x * rad), ay = G * S.sens * Math.sin(tilt.y * rad);
+  const n = 4, h = dt / n;
+  for (let i = 0; i < n; i++) {
+    ball.vx += ax * h; ball.vy += ay * h;
+    const damp = Math.exp(-S.fric * h); ball.vx *= damp; ball.vy *= damp;
+    const sp = Math.hypot(ball.vx, ball.vy), MAX = 1400; if (sp > MAX) { ball.vx *= MAX / sp; ball.vy *= MAX / sp; }
+    ball.x += ball.vx * h; ball.y += ball.vy * h;
+    for (const w of WALLS) if (w.alive) collide(w);
+  }
+  ball.spin += Math.hypot(ball.vx, ball.vy) * dt / R;
+  const dh = Math.hypot(ball.x - HOLE.x, ball.y - HOLE.y);
+  if (dh < HOLE.r - R * 0.35) { ball.fall = 0.001; sunk++; plop(); }
+  else if (dh < HOLE.r + R * 0.6) {   // the rim of the hole pulls the ball in a little
+    const k = 900 * dt; ball.vx += (HOLE.x - ball.x) / dh * k; ball.vy += (HOLE.y - ball.y) / dh * k;
+  }
+}
+function collide(w) {
+  const cx = Math.max(w.x, Math.min(ball.x, w.x + w.w)), cy = Math.max(w.y, Math.min(ball.y, w.y + w.h));
+  let dx = ball.x - cx, dy = ball.y - cy, d = Math.hypot(dx, dy);
+  if (d >= R) return;
+  if (d === 0) { dx = 0; dy = -1; d = 1; }
+  const nx = dx / d, ny = dy / d, vn = ball.vx * nx + ball.vy * ny;
+  if (vn >= 0) { ball.x += nx * (R - d); ball.y += ny * (R - d); return; }
+  if (w.k === 'crack' && -vn > S.brk) {   // fast enough: the cracked wall gives way and the ball keeps most of its speed
+    w.alive = false; broke++; crash(); shatter(w, ball.vx, ball.vy);
+    ball.vx *= 0.75; ball.vy *= 0.75; return;
+  }
+  ball.x += nx * (R - d); ball.y += ny * (R - d);
+  ball.vx -= (1 + S.bounce) * vn * nx; ball.vy -= (1 + S.bounce) * vn * ny;
+  knock(-vn);
+  hitFlash = Math.min(1, -vn / 500);
+}
+function shatter(w, vx, vy) {
+  for (let i = 0; i < 26; i++) bits.push({ x: w.x + Math.random() * w.w, y: w.y + Math.random() * w.h, vx: vx * 0.3 + (Math.random() - 0.5) * 160, vy: vy * 0.3 + (Math.random() - 0.5) * 160, s: 1 + Math.random() * 2, t: 0 });
+}
+
+// ---- drawing ----
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+let W = 0, H = 0, dpr = 1, sc = 1, ox = 0, oy = 0, hitFlash = 0;
+function fit() {
+  dpr = Math.min(3, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const top = 44, bottom = 76;
+  sc = Math.min((W - 24) / BW, (H - top - bottom) / BH); ox = (W - BW * sc) / 2; oy = top + (H - top - bottom - BH * sc) / 2;
+}
+addEventListener('resize', fit);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let C = {};
+function draw() {
+  C = C.board ? C : { board: css('--board'), grid: css('--grid'), wall: css('--wall'), top: css('--wall-top'), crack: css('--crack'), hole: css('--hole'), accent: css('--accent') };
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  g.save(); g.translate(ox, oy); g.scale(sc, sc);
+  // the board leans a hair with the phone, so the hand feels the slope it made
+  const lx = Math.max(-1, Math.min(1, tilt.x / 25)), ly = Math.max(-1, Math.min(1, tilt.y / 25));
+  g.fillStyle = C.board; g.fillRect(0, 0, BW, BH);
+  g.strokeStyle = C.grid; g.lineWidth = 0.25; g.beginPath();
+  for (let x = 10; x < BW; x += 10) { g.moveTo(x, 0); g.lineTo(x, BH); }
+  for (let y = 10; y < BH; y += 10) { g.moveTo(0, y); g.lineTo(BW, y); }
+  g.stroke();
+  // the hole, deeper toward its far side
+  const hg = g.createRadialGradient(HOLE.x - lx * 1.5, HOLE.y - ly * 1.5, 0, HOLE.x, HOLE.y, HOLE.r);
+  hg.addColorStop(0, C.hole); hg.addColorStop(0.8, C.hole); hg.addColorStop(1, '#2a2e3a');
+  g.fillStyle = hg; g.beginPath(); g.arc(HOLE.x, HOLE.y, HOLE.r, 0, Math.PI * 2); g.fill();
+  // walls: a face and a lit top, the face toward the low side
+  for (const w of WALLS) if (w.alive) {
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(w.x + 1.2 - lx, w.y + 1.6 - ly, w.w, w.h);
+    g.fillStyle = w.k === 'crack' ? C.crack : C.wall; g.fillRect(w.x, w.y, w.w, w.h);
+    g.fillStyle = w.k === 'crack' ? '#e2ad73' : C.top; g.fillRect(w.x, w.y, w.w, Math.min(w.h, 1.1));
+    if (w.k === 'crack') { g.strokeStyle = '#5a3818'; g.lineWidth = 0.5; g.beginPath(); for (let x = w.x + 3; x < w.x + w.w - 2; x += 6) { g.moveTo(x, w.y); g.lineTo(x + 2, w.y + w.h * 0.5); g.lineTo(x + 0.5, w.y + w.h); } g.stroke(); }
+  }
+  for (const b of bits) { g.globalAlpha = Math.max(0, 1 - b.t / 0.8); g.fillStyle = C.crack; g.fillRect(b.x, b.y, b.s, b.s); }
+  g.globalAlpha = 1;
+  // the ball: a shadow thrown away from the light, a lit side, and a band that turns as it rolls
+  const k = ball.fall > 0 ? Math.max(0, 1 - ball.fall / 0.6) : 1, r = R * k;
+  if (r > 0.1) {
+    g.fillStyle = 'rgba(0,0,0,.4)'; g.beginPath(); g.ellipse(ball.x + 1.4 - lx * 1.2, ball.y + 1.8 - ly * 1.2, r * 1.05, r * 0.95, 0, 0, Math.PI * 2); g.fill();
+    const bg = g.createRadialGradient(ball.x - r * 0.4, ball.y - r * 0.45, r * 0.1, ball.x, ball.y, r);
+    bg.addColorStop(0, '#fff6d8'); bg.addColorStop(0.35, C.accent); bg.addColorStop(1, '#b0741c');
+    g.fillStyle = bg; g.beginPath(); g.arc(ball.x, ball.y, r, 0, Math.PI * 2); g.fill();
+    g.save(); g.beginPath(); g.arc(ball.x, ball.y, r, 0, Math.PI * 2); g.clip();
+    const dir = Math.atan2(ball.vy, ball.vx), off = Math.sin(ball.spin) * r * 0.8;
+    g.strokeStyle = 'rgba(120,70,10,.55)'; g.lineWidth = r * 0.28; g.beginPath();
+    g.moveTo(ball.x + Math.cos(dir) * off - Math.sin(dir) * r, ball.y + Math.sin(dir) * off + Math.cos(dir) * r);
+    g.lineTo(ball.x + Math.cos(dir) * off + Math.sin(dir) * r, ball.y + Math.sin(dir) * off - Math.cos(dir) * r); g.stroke();
+    g.restore();
+  }
+  g.restore();
+  if (hitFlash > 0.02) { g.fillStyle = `rgba(255,207,90,${hitFlash * 0.08})`; g.fillRect(0, 0, W, H); }
+}
+
+let last = 0, hudT = 0;
+function frame(now) {
+  const dt = Math.min(0.033, (now - last) / 1000 || 0); last = now;
+  step(dt);
+  for (const b of bits) { b.t += dt; b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 0.92; b.vy *= 0.92; }
+  for (let i = bits.length - 1; i >= 0; i--) if (bits[i].t > 0.8) bits.splice(i, 1);
+  hitFlash *= Math.exp(-dt * 10);
+  draw();
+  if ((hudT += dt) > 0.15) {
+    hudT = 0;
+    document.getElementById('state').innerHTML = sensor ? `기울기 <b>${tilt.x.toFixed(0)}°</b>, <b>${tilt.y.toFixed(0)}°</b>` : '센서 없음 · 방향키로 시험';
+    document.getElementById('broke').textContent = broke; document.getElementById('sunk').textContent = sunk;
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---- starting: iPhones ask for the motion sensor from a tap ----
+const $ = id => document.getElementById(id);
+$('start').addEventListener('click', async () => {
+  try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  let ok = true;
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try { ok = (await DeviceOrientationEvent.requestPermission()) === 'granted'; } catch (e) { ok = false; }
+  }
+  if (!ok) { $('why').textContent = '동작 센서가 거부되었습니다. 설정 > Safari에서 동작 및 방향 접근을 켜고 다시 열어 주세요.'; return; }
+  addEventListener('deviceorientation', onOrient);
+  try { await navigator.wakeLock?.request('screen'); } catch (e) {}
+  $('cover').hidden = true;
+});
+$('zero').addEventListener('click', () => { if (raw) base = { ...raw }; tilt = { x: 0, y: 0 }; });
+$('tune').addEventListener('click', () => { $('panel').hidden = false; });
+$('close').addEventListener('click', () => { $('panel').hidden = true; });
+$('reset').addEventListener('click', () => { S = { ...DEF }; save(); syncUI(); for (const w of WALLS) w.alive = true; });
+const FMT = { sens: v => v.toFixed(2), fric: v => v.toFixed(2), bounce: v => v.toFixed(2), brk: v => String(Math.round(v)), dead: v => v.toFixed(1) + '°' };
+function syncUI() { for (const k of Object.keys(DEF)) { $(k).value = S[k]; $(k + 'V').textContent = FMT[k](+S[k]); } }
+for (const k of Object.keys(DEF)) $(k).addEventListener('input', e => { S[k] = +e.target.value; $(k + 'V').textContent = FMT[k](S[k]); save(); });
+syncUI(); fit(); requestAnimationFrame(frame);
+if (location.hash === '#board') { $('cover').hidden = true; keys.ArrowDown = keys.ArrowRight = true; }   // for a screenshot without a phone
+// broken walls come back after a while, so breaking can be tried again
+setInterval(() => { for (const w of WALLS) if (!w.alive && Math.hypot(ball.x - (w.x + w.w / 2), ball.y - (w.y + w.h / 2)) > 20) w.alive = true; }, 6000);
+</script>
+</body>
+</html>
