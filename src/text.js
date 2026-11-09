@@ -1,7 +1,7 @@
 // Every word on screen, in one place so it can be translated later.
 export const T = {
   title: '틸트 미로',
-  worlds: { 0: '연습', 1: '들판', 2: '물가', 3: '불의 협곡', 4: '얼음 들판', 5: '번개 공장', 6: '돌 채석장' },
+  worlds: { 0: '연습', 1: '들판', 2: '물가', 3: '불의 협곡', 4: '얼음 들판', 5: '번개 공장', 6: '돌 채석장', 7: '바람 절벽' },
   stage: l => (l.world === 0 ? `연습 ${l.index}` : `${l.index}단계`),
   continue: '이어하기', settings: '설정', coins: '코인',
   locked: '잠김',
@@ -10,7 +10,7 @@ export const T = {
   slotEmpty: '원소는 물의 세계부터', slotUse: '칸을 누르면 공이 원소를 둘러요', equip: '장착할 원소 (칸을 눌러 바꾸기)', none: '비움', pause: '일시 정지',
   resume: '계속하기', retry: '다시 하기', home: '처음 화면으로',
   clear: '통과!', reward: n => `코인 +${n}`, next: '다음 단계', lastDone: '들판을 모두 깼어요! 다음 세계는 곧 열려요.',
-  fail: { timeout: '시간이 다 됐어요', trap: '함정 구멍에 빠졌어요', fire: '불기둥에 닿았어요', lava: '용암에 빠졌어요', drown: '깊은 물에 빠졌어요', shock: '전기에 감전됐어요', caught: '적에게 잡혔어요' }, quench: '물에 닿아 불이 꺼졌어요',
+  fail: { timeout: '시간이 다 됐어요', trap: '함정 구멍에 빠졌어요', fire: '불기둥에 닿았어요', lava: '용암에 빠졌어요', drown: '깊은 물에 빠졌어요', shock: '전기에 감전됐어요', caught: '적에게 잡혔어요', fall: '틈으로 떨어졌어요' }, quench: '물에 닿아 불이 꺼졌어요',
   diffLocked: '앞 난이도의 들판을 모두 깨면 열려요', diffSoon: '곧 열려요', diffPick: '난이도',
   rest: '잠깐 쉬어요', restWhy: '같은 단계를 세 번 놓쳤어요.', restLeft: s => `${s}초`, restLater: '뒤에 다시 할 수 있어요', restSkip: '코인 10개로 바로 하기',
   sens: '민감도', sensNote: '같은 기울기에서 공이 얼마나 빨리 구르는지 정합니다.',

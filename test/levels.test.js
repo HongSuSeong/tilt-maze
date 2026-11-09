@@ -7,11 +7,11 @@ describe('levels', () => {
   it.each(LEVELS.map(l => [l.id, l]))('%s passes the check', (id, l) => expect(validateLevel(l)).toEqual([]));
   it.each(levelsFor('normal').map(l => [l.id, l]))('%s on normal passes the check', (id, l) => expect(validateLevel(l)).toEqual([]));
   it('ids are unique and in order', () => {
-    expect(LEVELS.map(l => l.id)).toEqual(['t1', 't2', 't3', ...[1, 2, 3, 4, 5, 6].flatMap(w => Array.from({ length: 10 }, (_, i) => `w${w}-${i + 1}`))]);
+    expect(LEVELS.map(l => l.id)).toEqual(['t1', 't2', 't3', ...[1, 2, 3, 4, 5, 6, 7].flatMap(w => Array.from({ length: 10 }, (_, i) => `w${w}-${i + 1}`))]);
     expect(levelById('w1-3').name).toBe('들판 3');
   });
   it('the tutorial leads into the fields, and the fields end', () => {
-    expect(nextLevel('t3').id).toBe('w1-1'); expect(nextLevel('w1-10').id).toBe('w2-1'); expect(nextLevel('w2-10').id).toBe('w3-1'); expect(nextLevel('w3-10').id).toBe('w4-1'); expect(nextLevel('w4-10').id).toBe('w5-1'); expect(nextLevel('w5-10').id).toBe('w6-1'); expect(nextLevel('w6-10')).toBe(null);
+    expect(nextLevel('t3').id).toBe('w1-1'); expect(nextLevel('w1-10').id).toBe('w2-1'); expect(nextLevel('w2-10').id).toBe('w3-1'); expect(nextLevel('w3-10').id).toBe('w4-1'); expect(nextLevel('w4-10').id).toBe('w5-1'); expect(nextLevel('w5-10').id).toBe('w6-1'); expect(nextLevel('w6-10').id).toBe('w7-1'); expect(nextLevel('w7-10')).toBe(null);
   });
   it('world 1 gets harder', () => {
     const w = LEVELS.filter(l => l.world === 1);
@@ -26,6 +26,7 @@ describe('levels', () => {
   it.each(LEVELS.filter(l => l.world === 4).map(l => [l.id, l]))('%s cannot be done without ice', (id, l) => expect(requires(l, 'ice')).toBe(true));
   it.each(LEVELS.filter(l => l.world === 5).map(l => [l.id, l]))('%s cannot be done without electricity', (id, l) => expect(requires(l, 'spark')).toBe(true));
   it.each(LEVELS.filter(l => l.world === 6).map(l => [l.id, l]))('%s cannot be done without stone', (id, l) => expect(requires(l, 'stone')).toBe(true));
+  it.each(LEVELS.filter(l => l.world === 7).map(l => [l.id, l]))('%s cannot be done without gas', (id, l) => expect(requires(l, 'gas')).toBe(true));
   it.each(LEVELS.filter(l => l.kit).map(l => [l.id, l]))('%s needs every element in its kit', (id, l) => { for (const el of l.kit) expect(requires(l, el)).toBe(true); });
   it('the tutorial stages carry a hint', () => expect(LEVELS.filter(l => l.world === 0).every(l => l.hint)).toBe(true));
 });
