@@ -19,8 +19,9 @@ const WORLD_TINT = {
   3: { light: { bg: '#FFF1E6', floor: '#FFE2CC', dot: '#FFD0AE', ring: '#FFB48A' }, dark: { bg: '#1A1210', floor: '#2A1A14', dot: '#3A2418', ring: '#FFB48A' } },
   4: { light: { bg: '#F2F8FC', floor: '#E3F1F8', dot: '#CFE6F2', ring: '#8FD8F0' }, dark: { bg: '#0D161C', floor: '#16242C', dot: '#22343E', ring: '#8FD8F0' } },
   5: { light: { bg: '#F3F6FF', floor: '#FFF8D9', dot: '#F4E9B5', ring: '#5B8CFF' }, dark: { bg: '#10131F', floor: '#1B1F2E', dot: '#2A3048', ring: '#7FA2FF' } },
+  6: { light: { bg: '#F4F1EC', floor: '#E6DFD5', dot: '#D6CDC0', ring: '#9A8F86' }, dark: { bg: '#141210', floor: '#221E1A', dot: '#322C26', ring: '#C9BEB3' } },
 };
-const ELEMENT_COLOR = { water: '#5BB8F5', fire: '#FF7A45', ice: '#8FD8F0', spark: '#FFD23F' };
+const ELEMENT_COLOR = { water: '#5BB8F5', fire: '#FF7A45', ice: '#8FD8F0', spark: '#FFD23F', stone: '#9A8F86' };
 
 function canvasTex(w, h, paint) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
@@ -78,8 +79,9 @@ export function createView(container) {
     box: new THREE.MeshStandardMaterial({ color: '#FFD23F', emissive: '#FFB800', emissiveIntensity: 0 }),
     foe: new THREE.MeshStandardMaterial({ color: '#8A6BFF', emissive: '#5A3FD9', emissiveIntensity: 0.35, roughness: 0.4 }),
     eye: new THREE.MeshBasicMaterial({ color: '#FFFFFF' }),
+    thick: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#A39A90'; g.fillRect(0, 0, w, h); g.strokeStyle = '#7E756C'; g.lineWidth = 4; for (let r = 0; r < 2; r++) for (let x = (r % 2) * 24; x < w; x += 48) g.strokeRect(x, r * h / 2, 48, h / 2); }), roughness: 0.95 }),
   };
-  const WALL_MAT = { wall: mat.wall, crack: mat.crack, vine: mat.vine, ice: mat.ice, door: mat.door, fence: mat.fence };
+  const WALL_MAT = { wall: mat.wall, crack: mat.crack, vine: mat.vine, ice: mat.ice, door: mat.door, fence: mat.fence, thick: mat.thick };
   const board = new THREE.Group(); scene.add(board);
   const ball = new THREE.Mesh(new THREE.SphereGeometry(R * U, 40, 24), mat.ball); ball.castShadow = true;
   const coat = new THREE.Mesh(new THREE.SphereGeometry(R * U * 1.28, 32, 20), mat.coat); coat.visible = false;   // the element the ball wears
@@ -216,7 +218,7 @@ export function createView(container) {
     const sink = b.fall > 0 ? Math.min(1, b.fall / 0.5) : 0;
     ball.position.set(X(b.x), R * U - sink * R * U * 2.4, Z(b.y)); ball.scale.setScalar(1 - sink * 0.3); ball.visible = b.fall < 0.9;
     coat.visible = !!run.coat && ball.visible; coat.position.copy(ball.position);
-    if (run.coat) { mat.coat.color.set(ELEMENT_COLOR[run.coat.el] || '#ffffff'); mat.coat.opacity = run.coat.left < 1.5 ? 0.2 + 0.2 * (Math.sin(clock * 18) > 0) : 0.38; }   // blinks as it wears off
+    if (run.coat) { const k = run.coat.el === 'stone' ? 0.8 : 0.38; mat.coat.color.set(ELEMENT_COLOR[run.coat.el] || '#ffffff'); mat.coat.opacity = run.coat.left < 1.5 ? k * (0.5 + 0.5 * (Math.sin(clock * 18) > 0)) : k; }   // stone all but hides the ball   // blinks as it wears off
     if (sp > FEEL.brk && b.fall === 0) { const t = trail[trailI++ % trail.length]; t.t = 0; t.m.position.copy(ball.position); t.m.visible = true; }
     for (const t of trail) if (t.m.visible) { t.t += dt; t.m.material.opacity = Math.max(0, 0.55 * (1 - t.t / 0.28)); t.m.scale.setScalar(Math.max(0.05, 1 - t.t * 2)); if (t.t > 0.28) t.m.visible = false; }
     for (let i = bits.length - 1; i >= 0; i--) {
