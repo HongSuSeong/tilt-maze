@@ -16,8 +16,9 @@ const PALETTE = {
 // each world tints the board; what it does not name comes from the palette above
 const WORLD_TINT = {
   2: { light: { bg: '#EAF4FB', floor: '#CDEBFA', dot: '#B5DDF4', ring: '#7FC4E8' }, dark: { bg: '#0E1A22', floor: '#142630', dot: '#1E3A48', ring: '#6FD0FF' } },
+  3: { light: { bg: '#FFF1E6', floor: '#FFE2CC', dot: '#FFD0AE', ring: '#FFB48A' }, dark: { bg: '#1A1210', floor: '#2A1A14', dot: '#3A2418', ring: '#FFB48A' } },
 };
-const ELEMENT_COLOR = { water: '#5BB8F5' };
+const ELEMENT_COLOR = { water: '#5BB8F5', fire: '#FF7A45' };
 
 function canvasTex(w, h, paint) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
@@ -62,13 +63,20 @@ export function createView(container) {
     core: new THREE.MeshStandardMaterial({ color: '#FFE08A', emissive: '#FFC23D', emissiveIntensity: 1.4 }),
     steam: new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, depthWrite: false }),
     coat: new THREE.MeshStandardMaterial({ color: '#5BB8F5', transparent: true, opacity: 0.35, roughness: 0.1, depthWrite: false }),
+    vine: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#6FBF5A'; g.fillRect(0, 0, w, h); g.fillStyle = '#4E9A3E'; for (let i = 0; i < 40; i++) { g.beginPath(); g.ellipse((i * 53) % w, (i * 29) % h, 9, 5, i, 0, 7); g.fill(); } }), roughness: 0.8 }),
+    ice: new THREE.MeshStandardMaterial({ color: '#CFEFFF', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.78 }),
+    door: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#B07A4F'; g.fillRect(0, 0, w, h); g.fillStyle = '#8A5A36'; for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 4, h); }), roughness: 0.7 }),
+    lava: new THREE.MeshStandardMaterial({ color: '#FF8A55', emissive: '#FF5A1E', emissiveIntensity: 0.9, roughness: 0.4 }),
+    stone: new THREE.MeshStandardMaterial({ color: '#8C8580', roughness: 0.95 }),
+    post: new THREE.MeshStandardMaterial({ color: '#6B4A35', roughness: 0.8 }),
   };
+  const WALL_MAT = { wall: mat.wall, crack: mat.crack, vine: mat.vine, ice: mat.ice, door: mat.door };
   const board = new THREE.Group(); scene.add(board);
   const ball = new THREE.Mesh(new THREE.SphereGeometry(R * U, 40, 24), mat.ball); ball.castShadow = true;
   const coat = new THREE.Mesh(new THREE.SphereGeometry(R * U * 1.28, 32, 20), mat.coat); coat.visible = false;   // the element the ball wears
   const trail = Array.from({ length: 24 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), mat.trail.clone()); m.visible = false; return { m, t: 9 }; });
   const bitGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16), coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 28);
-  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], trailI = 0, dark = false, clock = 0;
+  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
 
   function paint() {
@@ -89,7 +97,7 @@ export function createView(container) {
 
   function clear() {
     for (const o of [...board.children]) { board.remove(o); if (o !== ball && !trail.some(t => t.m === o) && o.geometry !== coinGeo && o.geometry !== bitGeo) o.geometry?.dispose(); }
-    walls = []; coins = []; bits = []; fires = []; puffs = [];
+    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = [];
   }
 
   function load(lv) {
@@ -97,7 +105,7 @@ export function createView(container) {
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(BW * U, BH * U), mat.floor); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; board.add(floor);
     const base = new THREE.Mesh(new RoundedBoxGeometry(BW * U + 0.5, 0.8, BH * U + 0.5, 4, 0.25), mat.base); base.position.y = -0.41; base.receiveShadow = true; board.add(base);
     for (const w of [{ x: 0, y: 0, w: BW, h: RIM }, { x: 0, y: BH - RIM, w: BW, h: RIM }, { x: 0, y: 0, w: RIM, h: BH }, { x: BW - RIM, y: 0, w: RIM, h: BH }]) block(w, mat.wall);
-    walls = lv.walls.map(w => block(w, w.kind === 'crack' ? mat.crack : mat.wall));
+    walls = lv.walls.map(w => block(w, WALL_MAT[w.kind] || mat.wall));
     coins = lv.coins.map(c => { const m = new THREE.Mesh(coinGeo, mat.coin); m.rotation.z = Math.PI / 2; m.position.set(X(c.x), 0.45, Z(c.y)); m.castShadow = true; board.add(m); return m; });
     // the goal wears a mint ring; trap holes an orange-red one
     for (const [h, ringMat] of [[lv.hole, mat.ring], ...(lv.traps || []).map(t => [t, mat.trap])]) {
@@ -116,6 +124,16 @@ export function createView(container) {
       const core = new THREE.Mesh(new THREE.ConeGeometry(f.r * U * 0.4, 0.9, 14), mat.core); core.position.y = 0.6; g.add(core);
       board.add(g); return { g, flame, core, f };
     });
+    lavas = (lv.lava || []).map(L => {
+      const m = new THREE.Mesh(roundRect(L.w * U, L.h * U, Math.min(L.w, L.h) * U * 0.3), mat.lava); m.rotation.x = -Math.PI / 2; m.position.set(X(L.x + L.w / 2), 0.012, Z(L.y + L.h / 2)); board.add(m); return m;
+    });
+    torches = (lv.torches || []).map(t => {   // a post with a bowl; a flame once lit
+      const g = new THREE.Group(); g.position.set(X(t.x), 0, Z(t.y));
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.9, 10), mat.post); post.position.y = 0.45; post.castShadow = true; g.add(post);
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.14, 0.18, 14), mat.vent); bowl.position.y = 0.95; g.add(bowl);
+      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.6, 14), mat.flame); flame.position.y = 1.35; flame.visible = false; g.add(flame);
+      board.add(g); return { g, flame };
+    });
     board.add(ball); board.add(coat); for (const t of trail) { t.m.visible = false; board.add(t.m); }
     ball.quaternion.identity(); ball.visible = true; ball.scale.setScalar(1); coat.visible = false;
     paint();
@@ -133,9 +151,9 @@ export function createView(container) {
   }
 
   function shatter(i, b) {
-    const w = level.walls[i];
+    const w = level.walls[i], m0 = WALL_MAT[w.kind] || mat.crack;
     for (let k = 0; k < 22; k++) {
-      const m = new THREE.Mesh(bitGeo, mat.crack); m.castShadow = true;
+      const m = new THREE.Mesh(bitGeo, m0); m.castShadow = true;
       m.position.set(X(w.x + Math.random() * w.w), Math.random() * WALL_H, Z(w.y + Math.random() * w.h)); board.add(m);
       bits.push({ m, v: new THREE.Vector3(b.vx * U * 0.25 + (Math.random() - 0.5) * 4, 2 + Math.random() * 3, b.vy * U * 0.25 + (Math.random() - 0.5) * 4), s: [Math.random() * 9, Math.random() * 9], t: 0 });
     }
@@ -145,7 +163,14 @@ export function createView(container) {
     clock += dt;
     const b = run.ball, k = FEEL.lean * Math.PI / 180;
     board.rotation.x += (tilt.y * k - board.rotation.x) * 0.35; board.rotation.z += (-tilt.x * k - board.rotation.z) * 0.35;
-    for (const e of events) { if (e.type === 'break') shatter(e.wall, b); if (e.type === 'douse') steam(level.fires[e.fire]); }
+    for (const e of events) {
+      if (e.type === 'break' || e.type === 'burnwall') shatter(e.wall, b);
+      if (e.type === 'douse') steam(level.fires[e.fire]);
+      if (e.type === 'cool') { const L = level.lava[e.lava]; steam({ x: L.x + L.w / 2, y: L.y + L.h / 2 }); }
+    }
+    lavas.forEach((m, i) => { m.material = run.state.cooled?.has(i) ? mat.stone : mat.lava; });
+    torches.forEach((t, i) => { t.flame.visible = !!run.state.lit?.has(i); t.flame.scale.set(1, 1 + 0.15 * Math.sin(clock * 11 + i), 1); });
+    mat.lava.emissiveIntensity = 0.75 + 0.25 * Math.sin(clock * 3.8);
     fires.forEach((F, i) => {   // flames sway; put out, only the vent is left
       const out = run.state.doused?.has(i); F.flame.visible = F.core.visible = !out;
       const k = 1 + 0.12 * Math.sin(clock * 9 + i) + 0.06 * Math.sin(clock * 23 + i * 2); F.flame.scale.set(1, k, 1); F.core.scale.set(1, 2 - k, 1);

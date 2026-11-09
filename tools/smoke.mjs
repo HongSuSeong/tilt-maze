@@ -48,6 +48,17 @@ try {
   await page.getByRole('button', { name: '시작' }).click();
   await page.locator('#slot0').dispatchEvent('pointerdown');
   check(await page.evaluate(() => window.__tm.run.coat?.el) === 'water', 'the slot coats the ball in water');
+  // fields and waterside cleared: the fire canyon comes next with water and fire in the two slots
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('tilt-maze:v1'));
+    for (let i = 1; i <= 10; i++) s.prog.easy.best[`w2-${i}`] = { stars: 1, time: 40 };
+    localStorage.setItem('tilt-maze:v1', JSON.stringify(s));
+  });
+  await page.reload();
+  check(await page.getByRole('button', { name: /이어하기 · 불의 협곡 1/ }).isVisible(), 'after the waterside comes the fire canyon');
+  await page.getByRole('button', { name: /이어하기/ }).click(); await page.getByRole('button', { name: '시작' }).click();
+  await page.locator('#slot1').dispatchEvent('pointerdown');
+  check(await page.evaluate(() => window.__tm.run.coat?.el) === 'fire', 'the second slot coats the ball in fire');
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } finally { await browser.close(); srv.kill(); }
 console.log(ok ? 'ALL PASS' : 'FAILED'); process.exitCode = ok ? 0 : 1;
