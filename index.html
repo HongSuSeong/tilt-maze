@@ -44,14 +44,14 @@ input[type=range] { width: 100%; height: 32px; accent-color: var(--accent); touc
 </head>
 <body>
 <canvas id="c"></canvas>
-<div class="hud"><span id="state">센서 대기</span><span>깬 벽 <b id="broke">0</b> · 들어간 공 <b id="sunk">0</b></span></div>
+<div class="hud"><span id="state">센서 대기</span><span id="speed"></span><span>깬 벽 <b id="broke">0</b> · 들어간 공 <b id="sunk">0</b></span></div>
 <div class="bar"><button id="zero">지금을 수평으로</button><button id="tune">손맛 조절</button></div>
 
 <div class="panel" id="panel" hidden>
   <div class="row"><label for="sens">기울기 세기</label><input id="sens" type="range" min="0.2" max="2" step="0.05"><output id="sensV"></output></div>
   <div class="row"><label for="fric">구름 저항</label><input id="fric" type="range" min="0" max="3" step="0.05"><output id="fricV"></output></div>
   <div class="row"><label for="bounce">튕김</label><input id="bounce" type="range" min="0" max="0.9" step="0.05"><output id="bounceV"></output></div>
-  <div class="row"><label for="brk">벽 깨는 속도</label><input id="brk" type="range" min="100" max="900" step="10"><output id="brkV"></output></div>
+  <div class="row"><label for="brk">벽 깨는 속도</label><input id="brk" type="range" min="80" max="600" step="10"><output id="brkV"></output></div>
   <div class="row"><label for="dead">무시할 기울기</label><input id="dead" type="range" min="0" max="6" step="0.5"><output id="deadV"></output></div>
   <p class="note">폰이 자꾸 가로로 돌아가면 제어 센터에서 화면 회전 잠금을 켜 주세요. 마음에 드는 값이 생기면 숫자를 알려 주세요.</p>
   <div class="btns"><button id="reset">기본값</button><button id="close" class="main">닫기</button></div>
@@ -60,7 +60,7 @@ input[type=range] { width: 100%; height: 32px; accent-color: var(--accent); touc
 <div class="cover" id="cover">
   <div class="card">
     <h1>폰을 바닥과 수평으로 들어 주세요</h1>
-    <p>기울여서 공을 굴립니다. 빠르게 부딪히면 금 간 벽이 깨지고, 검은 구멍에 넣으면 아래로 떨어집니다.</p>
+    <p>기울여서 공을 굴립니다. 길게 달려 빠르게 부딪히면 금 간 벽이 깨지고(공 뒤에 불꽃이 보이면 충분히 빠릅니다), 검은 구멍에 넣으면 아래로 떨어집니다.</p>
     <button id="start" class="main">시작하기</button>
     <p class="note" id="why"></p>
   </div>
@@ -72,22 +72,22 @@ input[type=range] { width: 100%; height: 32px; accent-color: var(--accent); touc
 const BW = 100, BH = 160, R = 4.2;
 const WALLS = [   // [x, y, w, h], plus kind: 'crack' breaks when hit fast enough
   [0, 0, 100, 3], [0, 157, 100, 3], [0, 0, 3, 160], [97, 0, 3, 160],   // the rim
-  [3, 40, 62, 4], [35, 80, 62, 4], [3, 120, 40, 4], [60, 120, 4, 37],
-  [65, 40, 32, 4, 'crack'], [43, 120, 17, 4, 'crack'],
+  [3, 40, 77, 4], [35, 80, 62, 4], [43, 120, 17, 4], [60, 120, 4, 37],
+  [80, 3, 4, 37, 'crack'], [3, 120, 40, 4, 'crack'],   // each at the end of a long run: the speed to break one comes from distance
 ].map(([x, y, w, h, k]) => ({ x, y, w, h, k: k || 'wall', alive: true }));
 const HOLE = { x: 80, y: 140, r: 6.5 };
 const START = { x: 12, y: 15 };
-const DEF = { sens: 1, fric: 0.6, bounce: 0.35, brk: 330, dead: 1 };   // dead: degrees of tilt that do nothing, so a still hand stays still
+const DEF = { sens: 1, fric: 0.6, bounce: 0.35, brk: 220, dead: 1 };   // dead: degrees of tilt that do nothing, so a still hand stays still
 const U_PER_M = 400;   // a 25 cm board: 100 units are a quarter metre
 const G = 9.81 * U_PER_M * 5 / 7;   // a solid ball rolling down a slope accelerates at 5/7 g sin(angle)
 
 let S = { ...DEF };
-try { S = { ...DEF, ...JSON.parse(localStorage.getItem('tilt-spike') || '{}') }; } catch (e) {}
-const save = () => { try { localStorage.setItem('tilt-spike', JSON.stringify(S)); } catch (e) {} };
+try { S = { ...DEF, ...JSON.parse(localStorage.getItem('tilt-spike-2') || '{}') }; } catch (e) {}
+const save = () => { try { localStorage.setItem('tilt-spike-2', JSON.stringify(S)); } catch (e) {} };
 
 const ball = { x: START.x, y: START.y, vx: 0, vy: 0, fall: 0, spin: 0 };
 let tilt = { x: 0, y: 0 }, raw = null, base = null, sensor = false, keys = {}, broke = 0, sunk = 0;
-const bits = [];   // pieces of broken walls
+const bits = [], trail = [];   // pieces of broken walls; where the ball was while it was fast enough to break one
 
 // ---- the phone's tilt: beta front-back, gamma left-right; turned to match how the screen is rotated ----
 function onOrient(e) {
@@ -155,6 +155,7 @@ function step(dt) {
     for (const w of WALLS) if (w.alive) collide(w);
   }
   ball.spin += Math.hypot(ball.vx, ball.vy) * dt / R;
+  if (Math.hypot(ball.vx, ball.vy) > S.brk) trail.push({ x: ball.x, y: ball.y, t: 0 });
   const dh = Math.hypot(ball.x - HOLE.x, ball.y - HOLE.y);
   if (dh < HOLE.r - R * 0.35) { ball.fall = 0.001; sunk++; plop(); }
   else if (dh < HOLE.r + R * 0.6) {   // the rim of the hole pulls the ball in a little
@@ -213,8 +214,14 @@ function draw() {
     g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(w.x + 1.2 - lx, w.y + 1.6 - ly, w.w, w.h);
     g.fillStyle = w.k === 'crack' ? C.crack : C.wall; g.fillRect(w.x, w.y, w.w, w.h);
     g.fillStyle = w.k === 'crack' ? '#e2ad73' : C.top; g.fillRect(w.x, w.y, w.w, Math.min(w.h, 1.1));
-    if (w.k === 'crack') { g.strokeStyle = '#5a3818'; g.lineWidth = 0.5; g.beginPath(); for (let x = w.x + 3; x < w.x + w.w - 2; x += 6) { g.moveTo(x, w.y); g.lineTo(x + 2, w.y + w.h * 0.5); g.lineTo(x + 0.5, w.y + w.h); } g.stroke(); }
+    if (w.k === 'crack') {   // cracks across the wall, along its length
+      g.strokeStyle = '#5a3818'; g.lineWidth = 0.5; g.beginPath();
+      if (w.w >= w.h) for (let x = w.x + 3; x < w.x + w.w - 2; x += 6) { g.moveTo(x, w.y); g.lineTo(x + 2, w.y + w.h * 0.5); g.lineTo(x + 0.5, w.y + w.h); }
+      else for (let y = w.y + 3; y < w.y + w.h - 2; y += 6) { g.moveTo(w.x, y); g.lineTo(w.x + w.w * 0.5, y + 2); g.lineTo(w.x + w.w, y + 0.5); }
+      g.stroke();
+    }
   }
+  for (const p of trail) { const a = Math.max(0, 1 - p.t / 0.25); g.globalAlpha = a * 0.8; g.fillStyle = '#ff8a3d'; g.beginPath(); g.arc(p.x, p.y, R * (0.4 + 0.6 * a), 0, Math.PI * 2); g.fill(); }
   for (const b of bits) { g.globalAlpha = Math.max(0, 1 - b.t / 0.8); g.fillStyle = C.crack; g.fillRect(b.x, b.y, b.s, b.s); }
   g.globalAlpha = 1;
   // the ball: a shadow thrown away from the light, a lit side, and a band that turns as it rolls
@@ -242,10 +249,12 @@ function frame(now) {
   for (const b of bits) { b.t += dt; b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 0.92; b.vy *= 0.92; }
   for (let i = bits.length - 1; i >= 0; i--) if (bits[i].t > 0.8) bits.splice(i, 1);
   hitFlash *= Math.exp(-dt * 10);
+  for (const p of trail) p.t += dt; while (trail.length && trail[0].t > 0.25) trail.shift();
   draw();
   if ((hudT += dt) > 0.15) {
     hudT = 0;
     document.getElementById('state').innerHTML = sensor ? `기울기 <b>${tilt.x.toFixed(0)}°</b>, <b>${tilt.y.toFixed(0)}°</b>` : '센서 없음 · 방향키로 시험';
+    const sp = Math.hypot(ball.vx, ball.vy); document.getElementById('speed').innerHTML = `속도 <b style="color:${sp > S.brk ? '#ff8a3d' : ''}">${sp.toFixed(0)}</b> / ${S.brk}`;
     document.getElementById('broke').textContent = broke; document.getElementById('sunk').textContent = sunk;
   }
   requestAnimationFrame(frame);
