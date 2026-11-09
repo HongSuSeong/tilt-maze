@@ -66,6 +66,9 @@ try {
   await page.getByRole('button', { name: /이어하기/ }).click(); await page.getByRole('button', { name: '시작' }).click();
   await page.locator('#slot1').dispatchEvent('pointerdown');
   check(await page.evaluate(() => window.__tm.run.coat?.el) === 'ice', 'the new element sits in the second slot');
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('tilt-maze:v1')); for (let i = 1; i <= 10; i++) s.prog.easy.best[`w4-${i}`] = { stars: 1, time: 40 }; localStorage.setItem('tilt-maze:v1', JSON.stringify(s)); });
+  await page.reload();
+  check(await page.getByRole('button', { name: /이어하기 · 번개 공장 1/ }).isVisible(), 'after the ice field comes the spark works');
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } finally { await browser.close(); srv.kill(); }
 console.log(ok ? 'ALL PASS' : 'FAILED'); process.exitCode = ok ? 0 : 1;
