@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createBall, stepBall } from '../src/physics.js';
 
 const lv = (o = {}) => ({ walls: [], coins: [], hole: null, ...o });
-const fresh = () => ({ broken: new Set(), got: new Set(), doused: new Set() });
+const fresh = () => ({ broken: new Set(), got: new Set(), doused: new Set(), lit: new Set(), cooled: new Set() });
 function run(ball, tilt, sec, level, state = fresh(), dt = 1 / 60) {
   const ev = [];
   for (let t = 0; t < sec; t += dt) ev.push(...stepBall(ball, tilt, dt, level, state, 1));
@@ -85,5 +85,35 @@ describe('physics', () => {
     const s = fresh(), ev = [], b = createBall(20, 80);
     for (let t = 0; t < 3; t += 1 / 60) ev.push(...stepBall(b, { x: 12, y: 0 }, 1 / 60, lv({ fires: [{ x: 45, y: 80, r: 5 }, { x: 70, y: 80, r: 5 }] }), s, 1, 'water'));
     expect([...s.doused].sort()).toEqual([0, 1]);
+  });
+  const roll = (b, tilt, sec, level, s, coat) => { const ev = []; for (let t = 0; t < sec; t += 1 / 60) ev.push(...stepBall(b, tilt, 1 / 60, level, s, 1, coat)); return ev; };
+  it('fire burns a vine wall away; without fire it is a wall', () => {
+    const level = lv({ walls: [{ x: 60, y: 60, w: 6, h: 40, kind: 'vine' }] });
+    const s = fresh(), ev = roll(createBall(40, 80), { x: 8, y: 0 }, 1.5, level, s, 'fire');
+    expect(ev.some(e => e.type === 'burnwall' && e.wall === 0)).toBe(true); expect(s.broken.has(0)).toBe(true);
+    const b = createBall(40, 80); roll(b, { x: 8, y: 0 }, 1.5, level, fresh(), 'water'); expect(b.x).toBeLessThan(60);
+  });
+  it('fire melts an ice wall', () => {
+    const s = fresh(); roll(createBall(40, 80), { x: 8, y: 0 }, 1.5, lv({ walls: [{ x: 60, y: 60, w: 6, h: 40, kind: 'ice' }] }), s, 'fire');
+    expect(s.broken.has(0)).toBe(true);
+  });
+  it('a torch lit with fire opens its door', () => {
+    const level = lv({ walls: [{ x: 70, y: 60, w: 6, h: 40, kind: 'door' }], torches: [{ x: 50, y: 80, door: 0 }] });
+    const s = fresh(), b = createBall(30, 80), ev = roll(b, { x: 8, y: 0 }, 2, level, s, 'fire');
+    expect(ev.some(e => e.type === 'light' && e.torch === 0)).toBe(true); expect(s.broken.has(0)).toBe(true); expect(b.x).toBeGreaterThan(76);
+    const shut = createBall(30, 80); roll(shut, { x: 8, y: 0 }, 2, level, fresh(), null); expect(shut.x).toBeLessThan(70);
+  });
+  it('water cools lava into a path before the ball sinks in', () => {
+    const level = lv({ lava: [{ x: 50, y: 60, w: 20, h: 40 }] });
+    const s = fresh(), b = createBall(30, 80), ev = roll(b, { x: 8, y: 0 }, 2, level, s, 'water');
+    expect(ev.some(e => e.type === 'cool' && e.lava === 0)).toBe(true); expect(ev.some(e => e.type === 'lava')).toBe(false); expect(b.x).toBeGreaterThan(70);
+  });
+  it('lava swallows a ball without water', () => {
+    const b = createBall(30, 80), ev = roll(b, { x: 8, y: 0 }, 2, lv({ lava: [{ x: 50, y: 60, w: 20, h: 40 }] }), fresh(), 'fire');
+    expect(ev.some(e => e.type === 'lava')).toBe(true); expect(b.x).toBeLessThan(70);
+  });
+  it('a puddle puts fire out', () => {
+    const ev = roll(createBall(30, 80), { x: 0, y: 0 }, 0.1, lv({ pools: [{ x: 20, y: 70, w: 20, h: 20 }] }), fresh(), 'fire');
+    expect(ev.some(e => e.type === 'quench')).toBe(true);
   });
 });

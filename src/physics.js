@@ -12,12 +12,14 @@ const FALL_DONE = 1.1;   // seconds from dropping into the hole to the stage bei
 export function createBall(x, y) { return { x, y, vx: 0, vy: 0, fall: 0 }; }
 
 // One frame. Returns what happened in it: knock {speed}, break {wall}, coin {coin}, hole, sunk, for a trap hole
-// trap {trap} then lost, and at a fire pillar douse {fire} (the ball wears water) or burn {fire} (it does not).
+// trap {trap} then lost, at a fire pillar douse {fire} (the ball wears water) or burn {fire} (it does not), burnwall
+// {wall} (fire takes a vine or ice wall), light {torch} (fire lights a torch and its door opens), cool {lava} (water
+// turns lava to stone) or lava {lava} (the ball sinks in), and quench (fire worn into a puddle goes out).
 // `coat` is the element the ball wears this frame, or null.
 export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   const ev = [];
   if (ball.burnt) return ev;
-  state.doused ??= new Set();
+  state.doused ??= new Set(); state.lit ??= new Set(); state.cooled ??= new Set();
   dt = Math.min(dt, 1 / 30);   // after a pause the frame gap can be long; a long step would carry the ball through walls
   if (ball.fall > 0) {   // dropping: drawn toward the middle of the hole until it is gone
     const h = ball.into, k = Math.min(1, dt * 10);
@@ -29,13 +31,26 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   const h = dt / FEEL.sub, fires = level.fires || [];
   const wet = (level.pools || []).some(p => ball.x > p.x && ball.x < p.x + p.w && ball.y > p.y && ball.y < p.y + p.h);
   const fric = FEEL.fric * (wet ? 5 : 1);   // a puddle holds the ball back
+  if (wet && coat === 'fire') { coat = null; ev.push({ type: 'quench' }); }   // ...and puts fire out
   for (let i = 0; i < FEEL.sub; i++) {
     ball.vx += ax * h; ball.vy += ay * h;
     const damp = Math.exp(-fric * h); ball.vx *= damp; ball.vy *= damp;
     const sp = Math.hypot(ball.vx, ball.vy); if (sp > FEEL.vmax) { ball.vx *= FEEL.vmax / sp; ball.vy *= FEEL.vmax / sp; }
     ball.x += ball.vx * h; ball.y += ball.vy * h;
     for (const w of RIM_WALLS) collide(ball, w, -1, ev);
-    level.walls.forEach((w, i) => { if (!state.broken.has(i)) collide(ball, w, i, ev, state); });
+    level.walls.forEach((w, i) => { if (!state.broken.has(i)) collide(ball, w, i, ev, state, coat); });
+    (level.torches || []).forEach((t, i) => {
+      if (coat !== 'fire' || state.lit.has(i) || Math.hypot(ball.x - t.x, ball.y - t.y) >= R + 2.5) return;
+      state.lit.add(i); state.broken.add(t.door); ev.push({ type: 'light', torch: i });
+    });
+    const lava = level.lava || [];
+    for (let k = 0; k < lava.length; k++) {
+      const L = lava[k]; if (state.cooled.has(k)) continue;
+      const near = Math.hypot(ball.x - Math.max(L.x, Math.min(ball.x, L.x + L.w)), ball.y - Math.max(L.y, Math.min(ball.y, L.y + L.h))) < R;
+      if (near && coat === 'water') { state.cooled.add(k); ev.push({ type: 'cool', lava: k }); continue; }
+      const m = R * 0.4;
+      if (ball.x > L.x + m && ball.x < L.x + L.w - m && ball.y > L.y + m && ball.y < L.y + L.h - m) { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'lava', lava: k }); return ev; }
+    }
     for (let f = 0; f < fires.length; f++) {
       if (state.doused.has(f) || Math.hypot(ball.x - fires[f].x, ball.y - fires[f].y) >= fires[f].r + R) continue;
       if (coat === 'water') { state.doused.add(f); ev.push({ type: 'douse', fire: f }); }
@@ -58,12 +73,13 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   return ev;
 }
 
-function collide(ball, w, i, ev, state) {
+function collide(ball, w, i, ev, state, coat) {
   const cx = Math.max(w.x, Math.min(ball.x, w.x + w.w)), cy = Math.max(w.y, Math.min(ball.y, w.y + w.h));
   let dx = ball.x - cx, dy = ball.y - cy, d = Math.hypot(dx, dy);
   if (d >= R) return;
   if (d === 0) { dx = 0; dy = -1; d = 1; }
   const nx = dx / d, ny = dy / d, vn = ball.vx * nx + ball.vy * ny;
+  if ((w.kind === 'vine' || w.kind === 'ice') && coat === 'fire') { state.broken.add(i); ev.push({ type: 'burnwall', wall: i }); return; }   // burnt or melted away
   if (vn >= 0) { ball.x += nx * (R - d); ball.y += ny * (R - d); return; }   // already moving away: just step out
   if (w.kind === 'crack' && -vn > FEEL.brk) {   // fast enough: the cracked wall gives way
     state.broken.add(i); ev.push({ type: 'break', wall: i });
