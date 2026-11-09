@@ -116,4 +116,18 @@ describe('physics', () => {
     const ev = roll(createBall(30, 80), { x: 0, y: 0 }, 0.1, lv({ pools: [{ x: 20, y: 70, w: 20, h: 20 }] }), fresh(), 'fire');
     expect(ev.some(e => e.type === 'quench')).toBe(true);
   });
+  it('a ball keeps sliding on ice', () => {
+    const dry = createBall(10, 80), icy = createBall(10, 80); dry.vx = icy.vx = 60;   // slow enough that neither reaches the rim
+    roll(dry, { x: 0, y: 0 }, 1, lv(), fresh(), null); roll(icy, { x: 0, y: 0 }, 1, lv({ slick: [{ x: 3, y: 60, w: 94, h: 40 }] }), fresh(), null);
+    expect(icy.x).toBeLessThan(90); expect(icy.vx).toBeGreaterThan(dry.vx * 1.5);
+  });
+  it('deep water drowns a ball', () => {
+    const b = createBall(30, 80), ev = roll(b, { x: 8, y: 0 }, 2, lv({ deep: [{ x: 50, y: 60, w: 20, h: 40 }] }), fresh(), 'fire');
+    expect(ev.some(e => e.type === 'drown' && e.deep === 0)).toBe(true); expect(b.x).toBeLessThan(70);
+  });
+  it('ice freezes deep water into a slippery bridge', () => {
+    const s = fresh(), b = createBall(30, 80), ev = roll(b, { x: 8, y: 0 }, 2, lv({ deep: [{ x: 50, y: 60, w: 20, h: 40 }] }), s, 'ice');
+    expect(ev.some(e => e.type === 'freeze' && e.deep === 0)).toBe(true); expect(ev.some(e => e.type === 'drown')).toBe(false);
+    expect(s.frozen.has(0)).toBe(true); expect(b.x).toBeGreaterThan(70);
+  });
 });

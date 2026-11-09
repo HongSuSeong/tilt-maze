@@ -14,12 +14,13 @@ export function createBall(x, y) { return { x, y, vx: 0, vy: 0, fall: 0 }; }
 // One frame. Returns what happened in it: knock {speed}, break {wall}, coin {coin}, hole, sunk, for a trap hole
 // trap {trap} then lost, at a fire pillar douse {fire} (the ball wears water) or burn {fire} (it does not), burnwall
 // {wall} (fire takes a vine or ice wall), light {torch} (fire lights a torch and its door opens), cool {lava} (water
-// turns lava to stone) or lava {lava} (the ball sinks in), and quench (fire worn into a puddle goes out).
+// turns lava to stone) or lava {lava} (the ball sinks in), quench (fire worn into a puddle goes out), and in deep
+// water freeze {deep} (ice turns it to a slippery bridge) or drown {deep}.
 // `coat` is the element the ball wears this frame, or null.
 export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   const ev = [];
   if (ball.burnt) return ev;
-  state.doused ??= new Set(); state.lit ??= new Set(); state.cooled ??= new Set();
+  state.doused ??= new Set(); state.lit ??= new Set(); state.cooled ??= new Set(); state.frozen ??= new Set();
   dt = Math.min(dt, 1 / 30);   // after a pause the frame gap can be long; a long step would carry the ball through walls
   if (ball.fall > 0) {   // dropping: drawn toward the middle of the hole until it is gone
     const h = ball.into, k = Math.min(1, dt * 10);
@@ -30,7 +31,9 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   const rad = Math.PI / 180, ax = FEEL.G * sens * Math.sin(tilt.x * rad), ay = FEEL.G * sens * Math.sin(tilt.y * rad);
   const h = dt / FEEL.sub, fires = level.fires || [];
   const wet = (level.pools || []).some(p => ball.x > p.x && ball.x < p.x + p.w && ball.y > p.y && ball.y < p.y + p.h);
-  const fric = FEEL.fric * (wet ? 5 : 1);   // a puddle holds the ball back
+  const inside = (r, x = ball.x, y = ball.y) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.h;
+  const deep = level.deep || [], icy = (level.slick || []).some(r => inside(r)) || deep.some((r, i) => state.frozen.has(i) && inside(r));
+  const fric = FEEL.fric * (wet ? 5 : icy ? 0.1 : 1);   // a puddle holds the ball back; ice hardly does
   if (wet && coat === 'fire') { coat = null; ev.push({ type: 'quench' }); }   // ...and puts fire out
   for (let i = 0; i < FEEL.sub; i++) {
     ball.vx += ax * h; ball.vy += ay * h;
@@ -43,6 +46,13 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
       if (coat !== 'fire' || state.lit.has(i) || Math.hypot(ball.x - t.x, ball.y - t.y) >= R + 2.5) return;
       state.lit.add(i); state.broken.add(t.door); ev.push({ type: 'light', torch: i });
     });
+    for (let k = 0; k < deep.length; k++) {
+      const D = deep[k]; if (state.frozen.has(k)) continue;
+      const near = Math.hypot(ball.x - Math.max(D.x, Math.min(ball.x, D.x + D.w)), ball.y - Math.max(D.y, Math.min(ball.y, D.y + D.h))) < R;
+      if (near && coat === 'ice') { state.frozen.add(k); ev.push({ type: 'freeze', deep: k }); continue; }
+      const m = R * 0.4;
+      if (ball.x > D.x + m && ball.x < D.x + D.w - m && ball.y > D.y + m && ball.y < D.y + D.h - m) { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'drown', deep: k }); return ev; }
+    }
     const lava = level.lava || [];
     for (let k = 0; k < lava.length; k++) {
       const L = lava[k]; if (state.cooled.has(k)) continue;
