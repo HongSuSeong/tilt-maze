@@ -22,4 +22,9 @@ describe('validateLevel', () => {
   it('the time limit stays between 20 and 120 seconds', () => {
     expect(validateLevel(base({ time: 10 })).length).toBeGreaterThan(0);
   });
+  it('a trap hole across the way blocks the hole', () => {
+    const e = validateLevel(base({ walls: [{ x: 3, y: 80, w: 40, h: 6, kind: 'wall' }, { x: 57, y: 80, w: 40, h: 6, kind: 'wall' }], traps: [{ x: 50, y: 83, r: 7 }] }));
+    expect(e).toContain('구멍에 갈 수 없음');
+  });
+  it('the start may not sit in a trap', () => expect(validateLevel(base({ traps: [{ x: 12, y: 15, r: 6 }] }))).toContain('시작점이 함정 안'));
 });

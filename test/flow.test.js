@@ -5,7 +5,7 @@ import { levelById } from '../src/levels/index.js';
 
 describe('after a stage is cleared', () => {
   it('keeps the stars, adds the reward and opens the next stage', () => {
-    const r = createRun(levelById('w1-1')); r.coins = 2; r.left = 45;   // 45 of 60 s left: three stars
+    const r = createRun(levelById('w1-1')); r.coins = 2; r.left = 35;   // 35 of 50 s left: three stars
     const out = afterClear(defaultSave(), r);
     expect(out.stars).toBe(3); expect(out.reward).toBe(22);
     expect(out.save.coins).toBe(22); expect(out.save.best['w1-1']).toEqual({ stars: 3, time: 15 });

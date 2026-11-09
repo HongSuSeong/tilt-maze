@@ -1,5 +1,5 @@
 // Can this stage be played? Every stage must pass before it ships: the hole and every coin can be reached (cracked
-// walls count as passable, since they can be broken), and every cracked wall has room enough in front of it to
+// walls count as passable, since they can be broken, trap holes do not), and every cracked wall has room enough in front of it to
 // build up the speed that breaks it. Messages are for whoever designs the stage.
 import { FEEL } from '../feel.js';
 
@@ -13,7 +13,8 @@ const inBoard = (x, y) => x >= RIM && x <= BW - RIM && y >= RIM && y <= BH - RIM
 const fits = (x, y, walls) => x >= LO && x <= HIX && y >= LO && y <= HIY && walls.every(w => distToRect(x, y, w) >= R - 1e-6);
 
 export function validateLevel(level) {
-  const err = [], { walls, coins, start, hole } = level;
+  const err = [], { walls, coins, start, hole } = level, traps = level.traps || [];
+  const inTrap = (x, y) => traps.some(t => Math.hypot(x - t.x, y - t.y) < t.r);
   walls.forEach((w, i) => { if (!(inBoard(w.x, w.y) && inBoard(w.x + w.w, w.y + w.h))) err.push(`벽 ${i}: 판 밖`); });
   if (!inBoard(start.x, start.y)) err.push('시작점: 판 밖');
   if (!inBoard(hole.x, hole.y)) err.push('구멍: 판 밖');
@@ -21,10 +22,11 @@ export function validateLevel(level) {
   if (!(level.time >= 20 && level.time <= 120)) err.push(`제한 시간 ${level.time}초 (20–120)`);
   const solid = walls.filter(w => w.kind !== 'crack');
   if (!fits(start.x, start.y, walls)) err.push('시작점이 벽에 붙어 있음');
+  if (inTrap(start.x, start.y)) err.push('시작점이 함정 안');
   coins.forEach((c, i) => { if (walls.some(w => distToRect(c.x, c.y, w) < R)) err.push(`코인 ${i}: 벽 안`); });
 
   // flood the board on a one-unit grid from the start, through cracked walls
-  const W = BW, H = BH, seen = new Uint8Array(W * H), free = (x, y) => fits(x + 0.5, y + 0.5, solid);
+  const W = BW, H = BH, seen = new Uint8Array(W * H), free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5);
   const sx = Math.floor(start.x), sy = Math.floor(start.y), q = [];
   if (free(sx, sy)) { seen[sy * W + sx] = 1; q.push(sx, sy); }
   for (let k = 0; k < q.length; k += 2) {

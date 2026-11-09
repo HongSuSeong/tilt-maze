@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { LEVELS, levelById, nextLevel } from '../src/levels/index.js';
 import { validateLevel } from '../src/levels/validate.js';
+import { applyDifficulty, levelsFor } from '../src/difficulty.js';
 
 describe('levels', () => {
   it.each(LEVELS.map(l => [l.id, l]))('%s passes the check', (id, l) => expect(validateLevel(l)).toEqual([]));
+  it.each(levelsFor('normal').map(l => [l.id, l]))('%s on normal passes the check', (id, l) => expect(validateLevel(l)).toEqual([]));
   it('ids are unique and in order', () => {
     expect(LEVELS.map(l => l.id)).toEqual(['t1', 't2', 't3', ...Array.from({ length: 10 }, (_, i) => `w1-${i + 1}`)]);
     expect(levelById('w1-3').name).toBe('들판 3');
