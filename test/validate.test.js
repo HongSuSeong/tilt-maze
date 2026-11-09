@@ -53,4 +53,10 @@ describe('validateLevel', () => {
     expect(validateLevel(base({ lava }))).toContain('구멍에 갈 수 없음');
     expect(validateLevel(base({ lava, kit: ['water'] }))).toEqual([]);
   });
+  it('deep water blocks unless the stage gives ice', () => {
+    const deep = [{ x: 3, y: 75, w: 94, h: 16 }];
+    expect(validateLevel(base({ deep }))).toContain('구멍에 갈 수 없음');
+    expect(validateLevel(base({ deep, kit: ['ice'] }))).toEqual([]);
+    expect(requires(base({ deep, kit: ['ice'] }), 'ice')).toBe(true);
+  });
 });

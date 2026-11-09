@@ -37,6 +37,7 @@ export function tickRun(run, tilt, dt, sens) {
     if (e.type === 'lost') { run.phase = 'fail'; run.reason = 'trap'; }
     if (e.type === 'burn') { run.phase = 'fail'; run.reason = 'fire'; }
     if (e.type === 'lava') { run.phase = 'fail'; run.reason = 'lava'; }
+    if (e.type === 'drown') { run.phase = 'fail'; run.reason = 'drown'; }
     if (e.type === 'quench') run.coat = null;
   }
   if (run.phase === 'play' && run.ball.fall === 0 && (run.left -= dt) <= 0) {   // the clock stops once the ball is dropping in

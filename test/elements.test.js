@@ -8,9 +8,10 @@ const flat = { x: 0, y: 0 };
 
 describe('elements', () => {
   it('water lasts five seconds and comes back three after', () => expect(ELEMENTS.water).toMatchObject({ name: '물', dur: 5, cool: 3 }));
-  it('each world brings its element', () => { expect(ownedFor(1)).toEqual([]); expect(ownedFor(2)).toEqual(['water']); expect(ownedFor(3)).toEqual(['water', 'fire']); });
+  it('each world brings its element', () => { expect(ownedFor(1)).toEqual([]); expect(ownedFor(2)).toEqual(['water']); expect(ownedFor(3)).toEqual(['water', 'fire']); expect(ownedFor(4)).toEqual(['water', 'fire', 'ice']); });
+  it('ice lasts five seconds too', () => expect(ELEMENTS.ice).toMatchObject({ name: '얼음', dur: 5, cool: 3 }));
   it('fire lasts five seconds too', () => expect(ELEMENTS.fire).toMatchObject({ name: '불', dur: 5, cool: 3 }));
-  it('the slots fill with what is owned', () => { expect(defaultSlots({ world: 1 })).toEqual([null, null]); expect(defaultSlots({ world: 2 })).toEqual(['water', null]); expect(defaultSlots({ world: 3 })).toEqual(['water', 'fire']); });
+  it('the slots fill with what is owned', () => { expect(defaultSlots({ world: 1 })).toEqual([null, null]); expect(defaultSlots({ world: 2 })).toEqual(['water', null]); expect(defaultSlots({ world: 3 })).toEqual(['water', 'fire']); expect(defaultSlots({ world: 4 })).toEqual(['fire', 'ice']); });
   it('a slot coats the ball for five seconds, then rests three', () => {
     const r = createRun(L()); startRun(r);
     expect(useSlot(r, 0)).toBe(true); expect(r.coat).toEqual({ el: 'water', left: 5 });
@@ -39,5 +40,9 @@ describe('elements', () => {
   it('lava loses the stage', () => {
     const r = createRun(L({ world: 3, fires: [], lava: [{ x: 50, y: 60, w: 20, h: 40 }] })); startRun(r); play(r, { x: 8, y: 0 }, 2);
     expect(r.phase).toBe('fail'); expect(r.reason).toBe('lava');
+  });
+  it('deep water loses the stage', () => {
+    const r = createRun(L({ world: 4, fires: [], deep: [{ x: 50, y: 60, w: 20, h: 40 }] })); startRun(r); play(r, { x: 8, y: 0 }, 2);
+    expect(r.phase).toBe('fail'); expect(r.reason).toBe('drown');
   });
 });

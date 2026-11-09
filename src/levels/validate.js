@@ -26,6 +26,8 @@ export function validateLevel(level) {
   const kit = level.kit || [], fire = kit.includes('fire'), torches = level.torches || [];
   const lava = kit.includes('water') ? [] : level.lava || [];   // water cools lava to stone
   const inLava = (x, y) => lava.some(L => x > L.x && x < L.x + L.w && y > L.y && y < L.y + L.h);
+  const deep = kit.includes('ice') ? [] : level.deep || [];   // ice freezes deep water into a bridge
+  const inDeep = (x, y) => deep.some(D => x > D.x && x < D.x + D.w && y > D.y && y < D.y + D.h);
   // what stands in the way: walls, and without fire vines, ice and doors; a door opens once its torch can be reached
   if (!fits(start.x, start.y, walls)) err.push('시작점이 벽에 붙어 있음');
   if (inTrap(start.x, start.y)) err.push('시작점이 함정 안');
@@ -36,7 +38,7 @@ export function validateLevel(level) {
   let seen;
   function flood(open) {
     const solid = walls.filter((w, i) => w.kind === 'wall' || ((w.kind === 'vine' || w.kind === 'ice') && !fire) || (w.kind === 'door' && !open.has(i)));
-    const free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5) && !burns(x + 0.5, y + 0.5) && !inLava(x + 0.5, y + 0.5);
+    const free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5) && !burns(x + 0.5, y + 0.5) && !inLava(x + 0.5, y + 0.5) && !inDeep(x + 0.5, y + 0.5);
     seen = new Uint8Array(W * H);
     const sx = Math.floor(start.x), sy = Math.floor(start.y), q = [];
     if (free(sx, sy)) { seen[sy * W + sx] = 1; q.push(sx, sy); }
