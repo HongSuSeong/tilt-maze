@@ -75,6 +75,9 @@ try {
   await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('tilt-maze:v1')); for (let i = 1; i <= 10; i++) s.prog.easy.best[`w6-${i}`] = { stars: 1, time: 40 }; localStorage.setItem('tilt-maze:v1', JSON.stringify(s)); });
   await page.reload();
   check(await page.getByRole('button', { name: /이어하기 · 바람 절벽 1/ }).isVisible(), 'after the quarry come the windy cliffs');
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('tilt-maze:v1')); for (let w = 7; w <= 9; w++) for (let i = 1; i <= 10; i++) s.prog.easy.best[`w${w}-${i}`] = { stars: 1, time: 40 }; localStorage.setItem('tilt-maze:v1', JSON.stringify(s)); });
+  await page.reload();
+  check(await page.getByRole('button', { name: /이어하기 · 원소의 끝 1/ }).isVisible(), 'the hundredth stage is reached through every world');
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } finally { await browser.close(); srv.kill(); }
 console.log(ok ? 'ALL PASS' : 'FAILED'); process.exitCode = ok ? 0 : 1;

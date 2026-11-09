@@ -21,6 +21,9 @@ const WORLD_TINT = {
   5: { light: { bg: '#F3F6FF', floor: '#FFF8D9', dot: '#F4E9B5', ring: '#5B8CFF' }, dark: { bg: '#10131F', floor: '#1B1F2E', dot: '#2A3048', ring: '#7FA2FF' } },
   6: { light: { bg: '#F4F1EC', floor: '#E6DFD5', dot: '#D6CDC0', ring: '#9A8F86' }, dark: { bg: '#141210', floor: '#221E1A', dot: '#322C26', ring: '#C9BEB3' } },
   7: { light: { bg: '#EEF8F3', floor: '#DDF2E8', dot: '#C6E7D8', ring: '#9CD66A' }, dark: { bg: '#0E1712', floor: '#16241D', dot: '#22352B', ring: '#B8E986' } },
+  8: { light: { bg: '#F5F2FB', floor: '#E7E0F5', dot: '#D6CCEB', ring: '#9C7BFF' }, dark: { bg: '#110F18', floor: '#1C1928', dot: '#2A2538', ring: '#B49CFF' } },
+  9: { light: { bg: '#0B0D14', floor: '#1A1D2B', dot: '#242838', ring: '#9C7BFF' }, dark: { bg: '#05060A', floor: '#14161F', dot: '#1E2130', ring: '#B49CFF' } },
+  10: { light: { bg: '#FBF6EA', floor: '#F2E6C8', dot: '#E6D6AE', ring: '#E0A100' }, dark: { bg: '#15120A', floor: '#231E12', dot: '#33291A', ring: '#FFC93C' } },
 };
 const ELEMENT_COLOR = { water: '#5BB8F5', fire: '#FF7A45', ice: '#8FD8F0', spark: '#FFD23F', stone: '#9A8F86', gas: '#B8E986' };
 
@@ -87,6 +90,7 @@ export function createView(container) {
   const board = new THREE.Group(); scene.add(board);
   const ball = new THREE.Mesh(new THREE.SphereGeometry(R * U, 40, 24), mat.ball); ball.castShadow = true;
   const coat = new THREE.Mesh(new THREE.SphereGeometry(R * U * 1.28, 32, 20), mat.coat); coat.visible = false;   // the element the ball wears
+  const lamp = new THREE.PointLight('#fff2dd', 0, 5.5, 1.6); lamp.castShadow = false;   // in the dark, the ball carries the only light
   const trail = Array.from({ length: 24 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), mat.trail.clone()); m.visible = false; return { m, t: 9 }; });
   const bitGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16), coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 28);
   let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], switches = [], foes = [], winds = [], trailI = 0, dark = false, clock = 0;
@@ -100,6 +104,7 @@ export function createView(container) {
     mat.wall.color.set(p.wall); mat.base.color.set(p.base); mat.hole.color.set(p.hole); mat.lip.color.set(p.lip); mat.ring.color.set(p.ring); mat.trap.color.set(p.trap);
     mat.coin.emissiveIntensity = p.glow;
     hemi.color.set(p.hemi[0]); hemi.groundColor.set(p.hemi[1]); hemi.intensity = p.hemi[2]; sun.intensity = p.sun;
+    if (level?.dim) { hemi.intensity = 0.05; sun.intensity = 0.03; lamp.intensity = 5; } else lamp.intensity = 0;
   }
 
   function block(w, m) {
@@ -169,7 +174,7 @@ export function createView(container) {
       const flame = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.6, 14), mat.flame); flame.position.y = 1.35; flame.visible = false; g.add(flame);
       board.add(g); return { g, flame };
     });
-    board.add(ball); board.add(coat); for (const t of trail) { t.m.visible = false; board.add(t.m); }
+    board.add(ball); board.add(coat); board.add(lamp); for (const t of trail) { t.m.visible = false; board.add(t.m); }
     ball.quaternion.identity(); ball.visible = true; ball.scale.setScalar(1); coat.visible = false;
     paint();
   }
@@ -228,7 +233,7 @@ export function createView(container) {
     if (sp > 0.01 && b.fall === 0) { axis.set(b.vy, 0, -b.vx).normalize(); q.setFromAxisAngle(axis, sp * dt / R); ball.quaternion.premultiply(q); }
     const sink = b.fall > 0 ? Math.min(1, b.fall / 0.5) : 0;
     ball.position.set(X(b.x), R * U - sink * R * U * 2.4, Z(b.y)); ball.scale.setScalar(1 - sink * 0.3); ball.visible = b.fall < 0.9;
-    coat.visible = !!run.coat && ball.visible; coat.position.copy(ball.position);
+    coat.visible = !!run.coat && ball.visible; coat.position.copy(ball.position); lamp.position.set(ball.position.x, 1.4, ball.position.z);
     if (run.coat) { const k = run.coat.el === 'stone' ? 0.8 : 0.38; mat.coat.color.set(ELEMENT_COLOR[run.coat.el] || '#ffffff'); mat.coat.opacity = run.coat.left < 1.5 ? k * (0.5 + 0.5 * (Math.sin(clock * 18) > 0)) : k; }   // stone all but hides the ball   // blinks as it wears off
     if (sp > FEEL.brk && b.fall === 0) { const t = trail[trailI++ % trail.length]; t.t = 0; t.m.position.copy(ball.position); t.m.visible = true; }
     for (const t of trail) if (t.m.visible) { t.t += dt; t.m.material.opacity = Math.max(0, 0.55 * (1 - t.t / 0.28)); t.m.scale.setScalar(Math.max(0.05, 1 - t.t * 2)); if (t.t > 0.28) t.m.visible = false; }
