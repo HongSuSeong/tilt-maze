@@ -1,5 +1,7 @@
 // One go at a stage: the clock, the coins picked up, clearing and failing, and the rest after three fails in a row.
 import { createBall, stepBall } from './physics.js';
+import { recordClear } from './save.js';
+import { nextLevel } from './levels/index.js';
 
 const REST = 30, SKIP_COST = 20, FAILS_TO_REST = 3;
 
@@ -42,3 +44,9 @@ export function skipRest(run, save) {
 export function starsFor(run) { const k = run.left / run.level.time; return k >= 0.5 ? 3 : k >= 0.25 ? 2 : 1; }
 export function rewardFor(run) { return run.coins + 5 + 5 * starsFor(run); }
 
+
+// A stage cleared: what the save keeps, and the stage that comes next (null after the last).
+export function afterClear(save, run) {
+  const stars = starsFor(run), reward = rewardFor(run);
+  return { save: recordClear(save, run.level.id, stars, run.level.time - run.left, reward), stars, reward, next: nextLevel(run.level.id) };
+}

@@ -1,0 +1,20 @@
+// Every word on screen, in one place so it can be translated later.
+export const T = {
+  title: '틸트 미로',
+  worlds: { 0: '연습', 1: '들판' },
+  stage: l => (l.world === 0 ? `연습 ${l.index}` : `${l.index}단계`),
+  continue: '이어하기', settings: '설정', coins: '코인',
+  locked: '잠김',
+  readyHold: '폰을 바닥과 수평으로 들고 시작을 누르세요',
+  start: '시작', left: '남은 시간',
+  slotEmpty: '원소는 물의 세계부터', pause: '일시 정지',
+  resume: '계속하기', retry: '다시 하기', home: '처음 화면으로',
+  clear: '통과!', reward: n => `코인 +${n}`, next: '다음 단계', lastDone: '들판을 모두 깼어요! 다음 세계는 곧 열려요.',
+  fail: { timeout: '시간이 다 됐어요' },
+  rest: '잠깐 쉬어요', restWhy: '같은 단계를 세 번 놓쳤어요.', restLeft: s => `${s}초`, restLater: '뒤에 다시 할 수 있어요', restSkip: '코인 20개로 바로 하기',
+  sens: '민감도', sensNote: '같은 기울기에서 공이 얼마나 빨리 구르는지 정합니다.',
+  sound: on => (on ? '소리 켜짐' : '소리 꺼짐'), vib: on => (on ? '진동 켜짐' : '진동 꺼짐'), dark: on => (on ? '다크 모드 켜짐' : '다크 모드 꺼짐'),
+  zero: '수평 다시 잡기', zeroDone: '지금 자세를 수평으로 잡았어요', close: '닫기',
+  sensorDenied: '동작 센서가 거부되었어요. 설정 > Safari > 동작 및 방향 접근을 켜고 다시 열어 주세요.',
+  noSensor: '이 기기에는 기울기 센서가 없어요. 방향키로 움직일 수 있어요.',
+};
