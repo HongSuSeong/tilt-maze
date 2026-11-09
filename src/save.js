@@ -1,27 +1,43 @@
-// What a player keeps between visits, in the phone's browser. Anything unreadable, from another version, or a
-// storage that refuses (private browsing) starts fresh and the game plays on without saving.
-import { LEVELS, nextLevel } from './levels/index.js';
+// What a player keeps between visits, in the phone's browser: coins, settings, and for each difficulty the best
+// result of every stage and how far they have come. Anything unreadable, from an unknown version, or a storage that
+// refuses (private browsing) starts fresh and the game plays on without saving. A version 1 save becomes easy.
+import { nextLevel } from './levels/index.js';
+import { levelsFor, BUILT, DIFFS } from './difficulty.js';
 
-const KEY = 'tilt-maze:v1', V = 1;
+const KEY = 'tilt-maze:v1', V = 2;
+const startOf = diff => levelsFor(diff)[0]?.id ?? null;
+const progFresh = () => Object.fromEntries(BUILT.map(d => [d, { best: {}, reached: startOf(d) }]));
 
-export const defaultSave = () => ({ v: V, coins: 0, best: {}, reached: 't1', opt: { sens: 1, snd: true, vib: true, dark: false } });
+export const defaultSave = () => ({ v: V, coins: 0, diff: 'easy', prog: progFresh(), opt: { sens: 1, snd: true, vib: true, dark: false } });
+
+function migrate(s) {
+  if (s?.v === V) return { ...s, prog: { ...progFresh(), ...s.prog } };   // a difficulty added later starts empty
+  if (s?.v === 1) { const d = defaultSave(); return { ...d, coins: s.coins ?? 0, opt: { ...d.opt, ...s.opt }, prog: { ...d.prog, easy: { best: s.best || {}, reached: s.reached || 't1' } } }; }
+  return defaultSave();
+}
 
 export function loadSave(storage = globalThis.localStorage) {
-  try {
-    const s = JSON.parse(storage.getItem(KEY));
-    return s && s.v === V ? s : defaultSave();
-  } catch { return defaultSave(); }
+  try { return migrate(JSON.parse(storage.getItem(KEY))); } catch { return defaultSave(); }
 }
 
 export function writeSave(s, storage = globalThis.localStorage) {
   try { storage.setItem(KEY, JSON.stringify(s)); return true; } catch { return false; }
 }
 
-const order = id => LEVELS.findIndex(l => l.id === id);
+const order = (diff, id) => levelsFor(diff).findIndex(l => l.id === id);
 
 // A stage cleared: the better stars and the quicker time are kept, the coins added, and the next stage opened.
-export function recordClear(s, id, stars, time, coins) {
-  const was = s.best[id], best = was ? { stars: Math.max(was.stars, stars), time: Math.min(was.time, time) } : { stars, time };
-  const next = nextLevel(id), reached = next && order(next.id) > order(s.reached) ? next.id : s.reached;
-  return { ...s, coins: s.coins + coins, best: { ...s.best, [id]: best }, reached };
+export function recordClear(s, diff, id, stars, time, coins) {
+  const p = s.prog[diff], was = p.best[id], best = was ? { stars: Math.max(was.stars, stars), time: Math.min(was.time, time) } : { stars, time };
+  const next = nextLevel(id, diff), reached = next && order(diff, next.id) > order(diff, p.reached) ? next.id : p.reached;
+  return { ...s, coins: s.coins + coins, prog: { ...s.prog, [diff]: { best: { ...p.best, [id]: best }, reached } } };
+}
+
+// Easy is always open; each next one opens when every stage of the one before (practice aside) is cleared.
+export function isOpen(s, diff) {
+  const i = DIFFS.findIndex(d => d.id === diff);
+  if (i === 0) return true;
+  if (!BUILT.includes(diff)) return false;
+  const before = DIFFS[i - 1].id;
+  return levelsFor(before).filter(l => l.world > 0).every(l => s.prog[before]?.best[l.id]);
 }

@@ -40,4 +40,9 @@ describe('run', () => {
     const r = createRun(L); startRun(r); play(r, { x: 10, y: 0 }, 0.6); retry(r);
     expect([r.ball.x, r.ball.y, r.coins, r.left, r.state.got.size]).toEqual([50, 80, 0, 40, 0]);
   });
+  it('a trap hole loses the stage', () => {
+    const r = createRun({ ...L, traps: [{ x: 60, y: 80, r: 6 }] }, 'normal'); startRun(r); play(r, { x: 10, y: 0 }, 3);
+    expect(r.phase).toBe('fail'); expect(r.reason).toBe('trap'); expect(r.diff).toBe('normal');
+  });
+  it('running out of time says so', () => { const r = createRun(L); startRun(r); play(r, flat, 41); expect(r.reason).toBe('timeout'); expect(r.diff).toBe('easy'); });
 });
