@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#EAF8F1">
+<title>기울기 3D 시험판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<style>
+/* throwaway spike: the A look ("soft toy") in real 3D. The board tilts on screen as the phone does. */
+:root {
+  --bg: #EAF8F1; --ink: #24453C; --mute: #5E8C7E; --card: #FFFFFF; --edge: #BFE6D5; --go: #48C99A; --go-edge: #2FA37A; --coin: #FFD34E;
+  color-scheme: light;
+}
+[hidden] { display: none !important; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; overscroll-behavior: none; touch-action: none;
+  font: 15px/1.35 'Jua', -apple-system, 'Apple SD Gothic Neo', sans-serif; user-select: none; -webkit-user-select: none; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hud { position: fixed; left: 0; right: 0; top: 0; display: flex; gap: 10px; align-items: stretch;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; }
+.pill { background: var(--card); border-radius: 20px; box-shadow: 0 4px 0 var(--edge); padding: 8px 14px; display: flex; flex-direction: column; justify-content: center; }
+.pill small { font-size: 12px; color: var(--mute); }
+.pill b { font-weight: 400; font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.time { flex: 1; gap: 6px; }
+.time .row { display: flex; justify-content: space-between; align-items: baseline; }
+.track { height: 8px; border-radius: 4px; background: #E3F3EC; overflow: hidden; }
+.track i { display: block; height: 100%; width: 100%; background: var(--go); border-radius: 4px; transition: width .2s linear; }
+.coins { flex-direction: row; align-items: center; gap: 8px; font-size: 20px; font-variant-numeric: tabular-nums; }
+.coin { width: 20px; height: 20px; border-radius: 50%; background: var(--coin); box-shadow: inset 0 0 0 3px #F2B92C; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; justify-content: center;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 16px) max(16px, env(safe-area-inset-left, 0px)); }
+button { font: inherit; color: var(--ink); background: var(--card); border: 0; border-radius: 20px; box-shadow: 0 5px 0 var(--edge); min-height: 52px; padding: 0 20px; font-size: 17px; }
+button:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--edge); }
+button.go { background: var(--go); color: #fff; box-shadow: 0 5px 0 var(--go-edge); }
+button.go:active { box-shadow: 0 2px 0 var(--go-edge); }
+.toast { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); background: var(--card); padding: 12px 20px; border-radius: 18px; box-shadow: 0 5px 0 var(--edge); font-size: 18px; pointer-events: none; transition: opacity .25s; }
+.cover { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(234, 248, 241, .86); padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
+.cover .card { width: min(340px, 100%); background: var(--card); border-radius: 28px; box-shadow: 0 8px 0 var(--edge); padding: 26px 22px; text-align: center; display: grid; gap: 14px; }
+.cover h1 { margin: 0; font-weight: 400; font-size: 24px; text-wrap: balance; }
+.cover p { margin: 0; color: var(--mute); }
+.cover button { min-height: 58px; font-size: 19px; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 26px 26px 0 0; box-shadow: 0 -6px 30px rgba(36, 69, 60, .15); display: grid; gap: 18px;
+  padding: 22px max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 18px) max(20px, env(safe-area-inset-left, 0px)); touch-action: pan-y; }
+.sheet h2 { margin: 0; font-weight: 400; font-size: 20px; }
+.field { display: grid; gap: 8px; }
+.field .row { display: flex; justify-content: space-between; color: var(--mute); }
+.field output { color: var(--ink); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; height: 34px; accent-color: var(--go); touch-action: pan-x; }
+.toggles { display: flex; gap: 10px; }
+.toggles button { flex: 1; }
+.toggles button[aria-pressed="false"] { color: var(--mute); background: #F1F6F3; }
+.sheet .done { width: 100%; }
+.note { font-size: 13px; color: var(--mute); margin: 0; }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div class="hud">
+  <div class="pill"><small>풀빛 들판</small><b>3단계</b></div>
+  <div class="pill time"><div class="row"><small>남은 시간</small><b id="time">1:00</b></div><div class="track"><i id="timeBar"></i></div></div>
+  <div class="pill coins"><span class="coin"></span><span id="coins">0</span></div>
+</div>
+<div class="bar"><button id="zero">수평 다시 잡기</button><button id="open">설정</button></div>
+<div class="toast" id="toast" hidden></div>
+
+<div class="sheet" id="sheet" hidden>
+  <h2>설정</h2>
+  <div class="field">
+    <div class="row"><label for="sens">민감도</label><output id="sensV">100%</output></div>
+    <input id="sens" type="range" min="0.5" max="1.5" step="0.05" value="1">
+    <p class="note">같은 기울기에서 공이 얼마나 빨리 구르는지 정합니다.</p>
+  </div>
+  <div class="toggles"><button id="snd" aria-pressed="true">소리 켜짐</button><button id="vib" aria-pressed="true">진동 켜짐</button></div>
+  <button id="close" class="go done">닫기</button>
+</div>
+
+<div class="cover" id="cover">
+  <div class="card">
+    <h1>폰을 바닥과 수평으로 들어 주세요</h1>
+    <p>기울이면 판이 같이 기울어요. 금 간 주황 벽은 길게 달려 세게 부딪히면 깨지고, 용암은 피하고, 구멍에 넣으면 성공이에요.</p>
+    <button id="start" class="go">시작하기</button>
+    <p class="note" id="why"></p>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+// ---------- the level, in board units: 100 wide, 160 deep (the phone's long side) ----------
+const BW = 100, BH = 160, R = 4.2, U = 0.1;   // U: board units to scene units
+const RIM = 3;
+const WALLS = [
+  [0, 0, 100, RIM], [0, BH - RIM, 100, RIM], [0, 0, RIM, BH], [BW - RIM, 0, RIM, BH],
+  [RIM, 32, 67, 6], [29, 66, 68, 6],                 // a long corridor between these two, run right to left
+  [20, 38, 6, 28, 'crack'],                          // ...ending at a cracked wall: the way down is behind it
+  [12, 100, 50, 6], [62, 100, 6, 41], [26, 126, 6, 31],
+].map(([x, y, w, h, k]) => ({ x, y, w, h, k: k || 'wall', alive: true }));
+const LAVA = [{ x: 30, y: 12, w: 22, h: 12 }];     // touch it and the ball goes back to the start
+const WATER = [{ x: 74, y: 112, w: 20, h: 14 }];   // slows the ball
+const COINS = [[60, 14], [50, 52], [45, 86], [80, 84], [40, 140], [85, 118]];
+const HOLE = { x: 84, y: 143, r: 7.4 };
+const START = { x: 12, y: 15 };
+const TIME = 60;
+
+// the feel found in the 2D spike; only sensitivity is the player's
+const FEEL = { fric: 0.6, bounce: 0.35, brk: 220, dead: 1 };
+const G = 9.81 * 400 * 5 / 7;   // a solid ball rolling down a slope: 5/7 g sin(angle); 400 board units to the metre
+let opt = { sens: 1, snd: true, vib: true };
+try { opt = { ...opt, ...JSON.parse(localStorage.getItem('tilt3d') || '{}') }; } catch (e) {}
+const keep = () => { try { localStorage.setItem('tilt3d', JSON.stringify(opt)); } catch (e) {} };
+
+// ---------- the scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#EAF8F1');
+const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
+scene.add(new THREE.HemisphereLight('#ffffff', '#9fd9bf', 1.15));
+const sun = new THREE.DirectionalLight('#fff6e8', 1.9);
+sun.position.set(-5, 14, 7); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, near: 1, far: 40 }); sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.02;
+scene.add(sun);
+
+const board = new THREE.Group(); scene.add(board);
+const X = x => (x - BW / 2) * U, Z = y => (y - BH / 2) * U;
+function canvasTex(w, h, paint) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
+// floor: mint with a soft dot grid
+const floorTex = canvasTex(512, 820, (g, w, h) => {
+  g.fillStyle = '#C7EFDB'; g.fillRect(0, 0, w, h); g.fillStyle = '#B1E4CB';
+  for (let y = 9; y < h; y += 18) for (let x = 9; x < w; x += 18) { g.beginPath(); g.arc(x, y, 2, 0, 7); g.fill(); }
+});
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(BW * U, BH * U), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.9 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; board.add(floor);
+const base = new THREE.Mesh(new RoundedBoxGeometry(BW * U + 0.5, 0.8, BH * U + 0.5, 4, 0.25), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.7 }));
+base.position.y = -0.41; base.receiveShadow = true; board.add(base);
+
+const WALL_H = 1.0;
+const wallMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.55 });
+const crackTex = canvasTex(256, 64, (g, w, h) => {
+  g.fillStyle = '#FFD7A3'; g.fillRect(0, 0, w, h); g.strokeStyle = '#E39B57'; g.lineWidth = 5;
+  for (let x = -40; x < w + 40; x += 34) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 12, h * 0.45); g.lineTo(x + 2, h); g.stroke(); }
+});
+const crackMat = new THREE.MeshStandardMaterial({ map: crackTex, roughness: 0.6 });
+for (const w of WALLS) {
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w.w * U, WALL_H, w.h * U, 3, Math.min(0.22, Math.min(w.w, w.h) * U * 0.45)), w.k === 'crack' ? crackMat : wallMat);
+  m.position.set(X(w.x + w.w / 2), WALL_H / 2, Z(w.y + w.h / 2)); m.castShadow = m.receiveShadow = true; board.add(m); w.mesh = m;
+}
+function roundRect(w, h, r) {
+  const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return new THREE.ShapeGeometry(s, 8);
+}
+const lavaMat = new THREE.MeshStandardMaterial({ color: '#FF8A55', emissive: '#FF6A2E', emissiveIntensity: 0.9, roughness: 0.4 });
+for (const l of LAVA) {
+  const m = new THREE.Mesh(roundRect(l.w * U, l.h * U, l.h * U * 0.5), lavaMat); m.rotation.x = -Math.PI / 2; m.position.set(X(l.x + l.w / 2), 0.012, Z(l.y + l.h / 2)); board.add(m);
+  const glow = new THREE.PointLight('#FF7A3C', 1.2, 3.2); glow.position.set(X(l.x + l.w / 2), 0.5, Z(l.y + l.h / 2)); board.add(glow);
+}
+const waterMat = new THREE.MeshStandardMaterial({ color: '#8FD3FF', roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.85 });
+for (const l of WATER) { const m = new THREE.Mesh(roundRect(l.w * U, l.h * U, l.h * U * 0.5), waterMat); m.rotation.x = -Math.PI / 2; m.position.set(X(l.x + l.w / 2), 0.01, Z(l.y + l.h / 2)); m.receiveShadow = true; board.add(m); }
+// the hole: a dark well with a white lip and a mint ring
+const holeDisc = new THREE.Mesh(new THREE.CircleGeometry(HOLE.r * U, 40), new THREE.MeshBasicMaterial({ color: '#0E2F2A' }));
+holeDisc.rotation.x = -Math.PI / 2; holeDisc.position.set(X(HOLE.x), 0.008, Z(HOLE.y)); board.add(holeDisc);
+const lip = new THREE.Mesh(new THREE.TorusGeometry(HOLE.r * U + 0.04, 0.07, 10, 40), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.5 }));
+lip.rotation.x = Math.PI / 2; lip.position.copy(holeDisc.position); board.add(lip);
+const ring = new THREE.Mesh(new THREE.RingGeometry(HOLE.r * U + 0.12, HOLE.r * U + 0.3, 40), new THREE.MeshBasicMaterial({ color: '#7FD4B4' }));
+ring.rotation.x = -Math.PI / 2; ring.position.set(X(HOLE.x), 0.006, Z(HOLE.y)); board.add(ring);
+// coins
+const coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 28), coinMat = new THREE.MeshStandardMaterial({ color: '#FFD34E', metalness: 0.05, roughness: 0.35, emissive: '#E0A100', emissiveIntensity: 0.35 })   // no environment to reflect, so a bright plastic gold rather than metal;
+const coins = COINS.map(([x, y]) => { const m = new THREE.Mesh(coinGeo, coinMat); m.rotation.z = Math.PI / 2; m.position.set(X(x), 0.45, Z(y)); m.castShadow = true; board.add(m); return { x, y, m, got: false }; });
+// the ball: coral with cream dots, so its rolling shows
+const ballTex = canvasTex(512, 256, (g, w, h) => {
+  g.fillStyle = '#FF6E5E'; g.fillRect(0, 0, w, h); g.fillStyle = '#FFF1DC';
+  for (let i = 0; i < 14; i++) { const x = (i * 97) % w, y = 30 + ((i * 53) % (h - 60)); g.beginPath(); g.arc(x, y, 16, 0, 7); g.fill(); }
+  g.fillStyle = '#FFA396'; g.fillRect(0, h / 2 - 6, w, 12);
+});
+const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(R * U, 40, 24), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.32 }));
+ballMesh.castShadow = true; board.add(ballMesh);
+// pieces of a broken wall and the trail of a fast ball
+const bits = [], bitGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16);
+const trail = [], trailMat = new THREE.MeshBasicMaterial({ color: '#FF9A55', transparent: true, opacity: 0.6, depthWrite: false });
+for (let i = 0; i < 24; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), trailMat.clone()); m.visible = false; board.add(m); trail.push({ m, t: 9 }); }
+let trailI = 0;
+
+function fit() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h;
+  // looking down at the board from a little toward the player, sized so it fills the space between the bars
+  const tilt = 62 * Math.PI / 180, top = 92, bottom = 92, share = (h - top - bottom) / h, fov = camera.fov * Math.PI / 180;
+  const needH = (BH * U + 1.2) / share / (2 * Math.tan(fov / 2)), needW = (BW * U + 1.2) / (2 * Math.tan(fov / 2) * camera.aspect);
+  const d = Math.max(needH * 1.0, needW) + 1.2;
+  camera.position.set(0, Math.sin(tilt) * d, Math.cos(tilt) * d);
+  camera.lookAt(0, 0, 0.35 + (bottom - top) / h * 4);
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', fit); fit();
+
+// ---------- tilt ----------
+let raw = null, ref = null, sensor = false, keys = {}, tilt = { x: 0, y: 0 };
+addEventListener('deviceorientation', e => { if (e.beta == null) return; sensor = true; raw = { b: e.beta, g: e.gamma }; if (!ref) ref = { ...raw }; });
+addEventListener('keydown', e => { keys[e.key] = true; }); addEventListener('keyup', e => { keys[e.key] = false; });
+const screenAngle = () => (screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0;
+function readTilt() {
+  if (!raw || !ref) { tilt.x += (((keys.ArrowRight ? 14 : 0) - (keys.ArrowLeft ? 14 : 0)) - tilt.x) * 0.2; tilt.y += (((keys.ArrowDown ? 14 : 0) - (keys.ArrowUp ? 14 : 0)) - tilt.y) * 0.2; return; }
+  let gx = raw.g - ref.g, gy = raw.b - ref.b;
+  const a = ((screenAngle() % 360) + 360) % 360;
+  if (a === 90) [gx, gy] = [gy, -gx]; else if (a === 270) [gx, gy] = [-gy, gx]; else if (a === 180) [gx, gy] = [-gx, -gy];
+  const dz = v => Math.sign(v) * Math.max(0, Math.abs(v) - FEEL.dead);
+  tilt.x += (dz(gx) - tilt.x) * 0.5; tilt.y += (dz(gy) - tilt.y) * 0.5;
+}
+
+// ---------- sound and touch ----------
+let ac = null;
+function tone(f0, f1, dur, vol, type = 'sine') {
+  if (!ac || !opt.snd) return;
+  const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+const buzz = p => { if (opt.vib && navigator.vibrate) navigator.vibrate(p); };
+function knock(v) { const k = Math.min(1, v / 600); if (k < 0.05) return; tone(170 + 140 * k, 60, 0.1, 0.45 * k); buzz(Math.round(8 + 22 * k)); }
+function crash() {
+  buzz([30, 20, 40]); if (!ac || !opt.snd) return;
+  const n = ac.sampleRate * 0.3, b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+  const s = ac.createBufferSource(), g = ac.createGain(); s.buffer = b; g.gain.value = 0.55; s.connect(g).connect(ac.destination); s.start();
+}
+const ding = () => { tone(1320, 1760, 0.12, 0.18, 'triangle'); buzz(12); };
+const plop = () => { tone(560, 90, 0.4, 0.35); buzz(70); };
+const sizzle = () => { tone(300, 80, 0.35, 0.3, 'sawtooth'); buzz([40, 30, 40]); };
+
+// ---------- play ----------
+const ball = { x: START.x, y: START.y, vx: 0, vy: 0, fall: 0 };
+let coinN = 0, left = TIME, burnT = 0;
+const $ = id => document.getElementById(id);
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; el.style.opacity = 1; clearTimeout(toast.h); toast.h = setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.hidden = true, 260); }, 1100); }
+function restart(msg) {
+  Object.assign(ball, { x: START.x, y: START.y, vx: 0, vy: 0, fall: 0 }); ballMesh.scale.setScalar(1);
+  for (const w of WALLS) if (!w.alive) { w.alive = true; w.mesh.visible = true; }
+  for (const c of coins) { c.got = false; c.m.visible = true; }
+  left = TIME; if (msg) toast(msg);
+}
+const inside = (r, x, y, pad = 0) => x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad;
+function step(dt) {
+  readTilt();
+  if (ball.fall > 0) {   // into the hole: it drops and shrinks, then the stage starts again
+    ball.fall += dt; ball.x += (HOLE.x - ball.x) * Math.min(1, dt * 10); ball.y += (HOLE.y - ball.y) * Math.min(1, dt * 10);
+    if (ball.fall > 1.1) restart('통과! 다시 해 볼까요');
+    return;
+  }
+  if (burnT > 0) { burnT -= dt; if (burnT <= 0) restart('용암에 빠졌어요'); return; }
+  const rad = Math.PI / 180, ax = G * opt.sens * Math.sin(tilt.x * rad), ay = G * opt.sens * Math.sin(tilt.y * rad);
+  const wet = WATER.some(w => inside(w, ball.x, ball.y)), fric = FEEL.fric * (wet ? 5 : 1);
+  const n = 4, h = dt / n;
+  for (let i = 0; i < n; i++) {
+    ball.vx += ax * h; ball.vy += ay * h;
+    const damp = Math.exp(-fric * h); ball.vx *= damp; ball.vy *= damp;
+    const sp = Math.hypot(ball.vx, ball.vy); if (sp > 1400) { ball.vx *= 1400 / sp; ball.vy *= 1400 / sp; }
+    ball.x += ball.vx * h; ball.y += ball.vy * h;
+    for (const w of WALLS) if (w.alive) collide(w);
+  }
+  for (const c of coins) if (!c.got && Math.hypot(ball.x - c.x, ball.y - c.y) < R + 3) { c.got = true; c.m.visible = false; coinN++; ding(); }
+  if (LAVA.some(l => inside(l, ball.x, ball.y, -R * 0.4))) { burnT = 0.45; sizzle(); return; }
+  const dh = Math.hypot(ball.x - HOLE.x, ball.y - HOLE.y);
+  if (dh < HOLE.r - R * 0.35) { ball.fall = 0.001; plop(); }
+  else if (dh < HOLE.r + R * 0.6) { const k = 900 * dt; ball.vx += (HOLE.x - ball.x) / dh * k; ball.vy += (HOLE.y - ball.y) / dh * k; }
+  if ((left -= dt) <= 0) restart('시간이 다 됐어요');
+}
+function collide(w) {
+  const cx = Math.max(w.x, Math.min(ball.x, w.x + w.w)), cy = Math.max(w.y, Math.min(ball.y, w.y + w.h));
+  let dx = ball.x - cx, dy = ball.y - cy, d = Math.hypot(dx, dy);
+  if (d >= R) return;
+  if (d === 0) { dx = 0; dy = -1; d = 1; }
+  const nx = dx / d, ny = dy / d, vn = ball.vx * nx + ball.vy * ny;
+  if (vn >= 0) { ball.x += nx * (R - d); ball.y += ny * (R - d); return; }
+  if (w.k === 'crack' && -vn > FEEL.brk) { w.alive = false; w.mesh.visible = false; crash(); shatter(w); ball.vx *= 0.75; ball.vy *= 0.75; return; }
+  ball.x += nx * (R - d); ball.y += ny * (R - d);
+  ball.vx -= (1 + FEEL.bounce) * vn * nx; ball.vy -= (1 + FEEL.bounce) * vn * ny;
+  knock(-vn);
+}
+function shatter(w) {
+  for (let i = 0; i < 22; i++) {
+    const m = new THREE.Mesh(bitGeo, crackMat); m.castShadow = true;
+    m.position.set(X(w.x + Math.random() * w.w), Math.random() * WALL_H, Z(w.y + Math.random() * w.h)); board.add(m);
+    bits.push({ m, v: new THREE.Vector3(ball.vx * U * 0.25 + (Math.random() - 0.5) * 4, 2 + Math.random() * 3, ball.vy * U * 0.25 + (Math.random() - 0.5) * 4), s: new THREE.Vector3(Math.random() * 9, Math.random() * 9, 0), t: 0 });
+  }
+}
+
+// ---------- each frame ----------
+const q = new THREE.Quaternion(), axis = new THREE.Vector3();
+let last = performance.now(), hudT = 0;
+function frame(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  step(dt);
+  // the board leans on screen with the phone, a little less than the hand does
+  const k = 0.4 * Math.PI / 180;
+  board.rotation.x += (tilt.y * k - board.rotation.x) * 0.35; board.rotation.z += (-tilt.x * k - board.rotation.z) * 0.35;
+  // the ball rolls: turned about the axis across its path by the distance over its radius
+  const sp = Math.hypot(ball.vx, ball.vy);
+  if (sp > 0.01 && ball.fall === 0) { axis.set(ball.vy, 0, -ball.vx).normalize(); q.setFromAxisAngle(axis, sp * dt / R); ballMesh.quaternion.premultiply(q); }
+  const sink = ball.fall > 0 ? Math.min(1, ball.fall / 0.5) : 0;
+  ballMesh.position.set(X(ball.x), R * U - sink * R * U * 2.4, Z(ball.y));
+  ballMesh.scale.setScalar(burnT > 0 ? Math.max(0.2, burnT / 0.45) : 1 - sink * 0.3);
+  ballMesh.visible = ball.fall < 0.9;
+  if (sp > FEEL.brk && ball.fall === 0) { const t = trail[trailI++ % trail.length]; t.t = 0; t.m.position.copy(ballMesh.position); t.m.visible = true; }
+  for (const t of trail) if (t.m.visible) { t.t += dt; t.m.material.opacity = Math.max(0, 0.55 * (1 - t.t / 0.28)); t.m.scale.setScalar(1 - t.t * 2); if (t.t > 0.28) t.m.visible = false; }
+  for (const c of coins) c.m.rotation.y += dt * 2.4;
+  lavaMat.emissiveIntensity = 0.75 + 0.25 * Math.sin(now / 260);
+  for (let i = bits.length - 1; i >= 0; i--) {
+    const b = bits[i]; b.t += dt; b.v.y -= 14 * dt; b.m.position.addScaledVector(b.v, dt); b.m.rotation.x += b.s.x * dt; b.m.rotation.y += b.s.y * dt;
+    if (b.m.position.y < 0.08) { b.m.position.y = 0.08; b.v.y *= -0.35; b.v.x *= 0.7; b.v.z *= 0.7; }
+    if (b.t > 1.4) { board.remove(b.m); bits.splice(i, 1); } else if (b.t > 1) b.m.scale.setScalar((1.4 - b.t) / 0.4);
+  }
+  renderer.render(scene, camera);
+  if ((hudT += dt) > 0.1) {
+    hudT = 0; const s = Math.max(0, Math.ceil(left));
+    $('time').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; $('timeBar').style.width = `${(left / TIME) * 100}%`;
+    $('coins').textContent = coinN;
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------- start and settings ----------
+$('start').addEventListener('click', async () => {
+  try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  let ok = true;
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try { ok = (await DeviceOrientationEvent.requestPermission()) === 'granted'; } catch (e) { ok = false; }
+  }
+  if (!ok) { $('why').textContent = '동작 센서가 거부되었어요. 설정 > Safari > 동작 및 방향 접근을 켜고 다시 열어 주세요.'; return; }
+  try { await navigator.wakeLock?.request('screen'); } catch (e) {}
+  ref = raw ? { ...raw } : null; $('cover').hidden = true; restart();
+});
+$('zero').addEventListener('click', () => { if (raw) ref = { ...raw }; tilt = { x: 0, y: 0 }; toast('지금 자세를 수평으로 잡았어요'); });
+$('open').addEventListener('click', () => { $('sheet').hidden = false; });
+$('close').addEventListener('click', () => { $('sheet').hidden = true; });
+function sync() {
+  $('sens').value = opt.sens; $('sensV').textContent = `${Math.round(opt.sens * 100)}%`;
+  for (const [id, k, on, off] of [['snd', 'snd', '소리 켜짐', '소리 꺼짐'], ['vib', 'vib', '진동 켜짐', '진동 꺼짐']]) { $(id).setAttribute('aria-pressed', String(opt[k])); $(id).textContent = opt[k] ? on : off; }
+}
+$('sens').addEventListener('input', e => { opt.sens = +e.target.value; sync(); keep(); });
+$('snd').addEventListener('click', () => { opt.snd = !opt.snd; sync(); keep(); });
+$('vib').addEventListener('click', () => { opt.vib = !opt.vib; sync(); keep(); });
+sync();
+if (location.hash === '#board') $('cover').hidden = true;   // for a screenshot without a phone
+</script>
+</body>
+</html>
