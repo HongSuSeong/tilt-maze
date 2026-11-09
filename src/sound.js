@@ -19,6 +19,14 @@ export function createSound(opt) {
     },
     ding() { tone(1320, 1760, 0.12, 0.18, 'triangle'); buzz(12); },
     plop() { tone(560, 90, 0.4, 0.35); buzz(70); },
+    coat() { tone(420, 760, 0.18, 0.2, 'triangle'); buzz(15); },
+    hiss() {
+      buzz(25); if (!ac || !opt().snd) return;
+      const n = ac.sampleRate * 0.5 | 0, b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.5) * 0.6;
+      const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'highpass'; f.frequency.value = 2500;
+      src.buffer = b; g.gain.value = 0.35; src.connect(f).connect(g).connect(ac.destination); src.start();
+    },
     fail() { tone(330, 140, 0.45, 0.3, 'triangle'); buzz([60, 40, 60]); },
     win() { tone(660, 990, 0.18, 0.25, 'triangle'); setTimeout(() => tone(990, 1320, 0.22, 0.22, 'triangle'), 140); },
   };

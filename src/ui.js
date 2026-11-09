@@ -2,11 +2,14 @@
 // It shows what it is told and hands every tap to the handlers; it keeps no game state of its own.
 import { T } from './text.js';
 import { DIFFS, levelsFor } from './difficulty.js';
-import { isOpen } from './save.js';
+import { isOpen, reachedOf } from './save.js';
+import { ELEMENTS, ownedFor } from './elements.js';
 
 const STAR = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.6l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z" fill="${on ? 'var(--star)' : 'var(--star-off)'}" stroke="${on ? '#E9A91A' : 'none'}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
 const PAUSE = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/></svg>';
 const LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:4px;vertical-align:-1px"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>';
+const DROP = c => `<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z" fill="${c}" stroke="#2F7FB8" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+const ICON = { water: DROP('#BFE7FF') };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function createUI(root, h) {
@@ -18,9 +21,9 @@ export function createUI(root, h) {
     </div>
     <div class="hint" id="hint" hidden></div>
     <div class="dock" id="dock" hidden>
-      <button class="slot" disabled aria-label="원소 칸 1, ${T.slotEmpty}"></button>
-      <button class="slot" disabled aria-label="원소 칸 2, ${T.slotEmpty}"></button>
-      <span class="note">${T.slotEmpty}</span>
+      <button class="slot" id="slot0"></button>
+      <button class="slot" id="slot1"></button>
+      <span class="note" id="slotNote"></span>
       <button class="round go" id="pauseBtn" aria-label="${T.pause}">${PAUSE}</button>
     </div>
     <div class="scrim" id="scrim" hidden><div class="card" id="card"></div></div>
@@ -29,6 +32,7 @@ export function createUI(root, h) {
     <div class="toast" id="toast" hidden></div>`);
   const $ = id => root.querySelector('#' + id);
   $('pauseBtn').addEventListener('click', h.pause);
+  for (const i of [0, 1]) $('slot' + i).addEventListener('pointerdown', e => { e.preventDefault(); h.useSlot(i); });   // on touch, not release: it is a reflex
   let toastT = 0;
 
   function card(html, see = true) {   // see: the board stays clear behind the card
@@ -40,7 +44,7 @@ export function createUI(root, h) {
   const label = l => { $('hudWorld').textContent = T.worlds[l.world] + (diffName ? ` · ${diffName}` : ''); $('hudStage').textContent = T.stage(l); };
 
   function home({ save, notice }) {
-    const diff = save.diff, ls = levelsFor(diff), p = save.prog[diff], at = Math.max(0, ls.findIndex(l => l.id === p.reached));
+    const diff = save.diff, ls = levelsFor(diff), p = save.prog[diff], at = Math.max(0, ls.findIndex(l => l.id === reachedOf(save, diff)));
     diffName = DIFFS.find(d => d.id === diff).name;
     const chip = d => {
       const open = isOpen(save, d.id);
@@ -74,7 +78,9 @@ export function createUI(root, h) {
       case 'home': bars(false); home(d); break;
       case 'ready':
         bars(true); label(d.level);
-        card(`<h2>${esc(d.level.name)}</h2>${d.level.hint ? `<p>${esc(d.level.hint)}</p>` : ''}<p>${T.readyHold}</p><button class="go" data-do="start">${T.start}</button>`);
+        card(`<h2>${esc(d.level.name)}</h2>${d.level.hint ? `<p>${esc(d.level.hint)}</p>` : ''}${equip(d.level, d.slots)}<p>${T.readyHold}</p><button class="go" data-do="start">${T.start}</button>`);
+        for (const b of root.querySelectorAll('[data-slot]')) b.addEventListener('click', () => h.cycleSlot(+b.dataset.slot));
+        slots(d.slots, null, [0, 0]);
         break;
       case 'play':
         bars(true); label(d.level); if (d.level.hint) { $('hint').textContent = d.level.hint; $('hint').hidden = false; }
@@ -96,6 +102,26 @@ export function createUI(root, h) {
         break;
       case 'settings': settings(d.opt); break;
     }
+  }
+
+  // the two slots on the ready card: tap one to change what goes in it
+  function equip(level, chosen) {
+    if (!ownedFor(level.world).length) return '';
+    return `<p>${T.equip}</p><div class="equip">${chosen.map((el, i) => el
+      ? `<button data-slot="${i}" aria-label="칸 ${i + 1}: ${ELEMENTS[el].name}">${ICON[el]}${ELEMENTS[el].name}</button>`
+      : `<button data-slot="${i}" class="empty" aria-label="칸 ${i + 1}: ${T.none}">${T.none}</button>`).join('')}</div>`;
+  }
+  // the slots in the dock: what each holds, how long the coat has left, how long until it can be used again
+  function slots(chosen, coat, cool) {
+    chosen.forEach((el, i) => {
+      const b = $('slot' + i), E = el && ELEMENTS[el];
+      b.disabled = !el; b.classList.toggle('has', !!el); b.style.setProperty('--el', E?.color || '');
+      b.setAttribute('aria-label', el ? `칸 ${i + 1}: ${E.name}` : `칸 ${i + 1}: ${T.none}`);
+      const wearing = coat && coat.el === el && cool[i] > E?.cool, wait = !wearing && cool[i] > 0;
+      const html = el ? `<span class="fill" style="height:${wearing ? (coat.left / E.dur) * 100 : 0}%"></span><span class="ico">${ICON[el]}${E.name}</span>${wait ? `<span class="wait">${Math.ceil(cool[i])}</span>` : ''}` : '';
+      if (b.dataset.html !== html) { b.innerHTML = html; b.dataset.html = html; }
+    });
+    const any = chosen.some(Boolean); $('slotNote').textContent = any ? T.slotUse : T.slotEmpty;
   }
 
   function rest(left, canSkip) {
@@ -129,6 +155,7 @@ export function createUI(root, h) {
       $('hudTime').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
       $('hudBar').style.width = `${Math.max(0, k) * 100}%`; $('hudTrack').classList.toggle('low', k < 0.25);
       $('hudCoins').textContent = run.coins;
+      slots(run.slots, run.coat, run.cool);
     },
     toast(text) { toastFn(text); },
   };

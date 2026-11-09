@@ -42,6 +42,14 @@ button.go:active:not(:disabled) { box-shadow: 0 2px 0 var(--go-edge); }
   padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 14px) max(16px, env(safe-area-inset-left, 0px)); }
 .slot { width: 64px; height: 64px; padding: 0; border-radius: 20px; background: var(--soft); box-shadow: inset 0 0 0 2px var(--edge); }
 .dock .note { flex: 1; font-size: 13px; color: var(--mute); }
+.slot { position: relative; overflow: hidden; display: grid; place-items: center; font-size: 12px; color: var(--ink); }
+.slot.has { background: var(--card); box-shadow: 0 5px 0 var(--edge); }
+.slot .fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--el, #5BB8F5); opacity: .35; pointer-events: none; }
+.slot .wait { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(36, 69, 60, .45); color: #fff; font-size: 20px; pointer-events: none; }
+.slot .ico { display: grid; gap: 1px; place-items: center; position: relative; }
+.equip { display: flex; gap: 10px; justify-content: center; }
+.equip button { width: 92px; min-height: 64px; padding: 4px; display: grid; gap: 2px; place-items: center; font-size: 13px; }
+.equip button.empty { color: var(--mute); background: var(--soft); }
 .dock .round { width: 56px; height: 56px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
 
 /* cards over a dimmed board */

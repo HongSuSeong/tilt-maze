@@ -35,6 +35,19 @@ try {
   if (seen) { await page.getByRole('button', { name: '다음 단계' }).click(); check(await page.getByText('연습 2').first().isVisible(), 'next stage is 연습 2'); }
   await page.reload();
   check((await page.locator('.grid button small').first().textContent()).includes('★'), 'stars kept after reload');
+  // an old save that had cleared the fields: the waterside opens next, its ready card offers water, and a slot coats the ball
+  await page.evaluate(() => {
+    const best = {}; for (const id of ['t1', 't2', 't3', ...Array.from({ length: 10 }, (_, i) => `w1-${i + 1}`)]) best[id] = { stars: 2, time: 30 };
+    localStorage.setItem('tilt-maze:v1', JSON.stringify({ v: 1, coins: 40, best, reached: 'w1-10', opt: { sens: 1, snd: true, vib: true, dark: false } }));
+  });
+  await page.reload();
+  check(await page.getByRole('button', { name: /이어하기 · 물가 1/ }).isVisible(), 'an old save that cleared the fields goes on to the waterside');
+  check(await page.getByRole('button', { name: '보통' }).getAttribute('data-locked') === null, 'and keeps normal open');
+  await page.getByRole('button', { name: /이어하기/ }).click();
+  check(await page.getByRole('button', { name: /칸 1: 물/ }).first().isVisible(), 'the ready card offers water');
+  await page.getByRole('button', { name: '시작' }).click();
+  await page.locator('#slot0').dispatchEvent('pointerdown');
+  check(await page.evaluate(() => window.__tm.run.coat?.el) === 'water', 'the slot coats the ball in water');
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } finally { await browser.close(); srv.kill(); }
 console.log(ok ? 'ALL PASS' : 'FAILED'); process.exitCode = ok ? 0 : 1;

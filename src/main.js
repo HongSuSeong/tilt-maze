@@ -7,8 +7,9 @@ import { createSound } from './sound.js';
 import { T } from './text.js';
 import { levelById } from './levels/index.js';
 import { levelsFor } from './difficulty.js';
-import { loadSave, writeSave } from './save.js';
-import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear } from './run.js';
+import { loadSave, writeSave, markOpened, reachedOf } from './save.js';
+import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear, useSlot, setSlots } from './run.js';
+import { ownedFor } from './elements.js';
 
 let save = loadSave();
 const tilt = createTilt(), keys = {}, view = createView(document.body), sound = createSound(() => save.opt);
@@ -18,7 +19,7 @@ const angle = () => (window.screen.orientation?.angle ?? window.orientation ?? 0
 const theme = () => { document.documentElement.dataset.theme = save.opt.dark ? 'dark' : 'light'; view.setDark(save.opt.dark); };
 
 addEventListener('deviceorientation', e => { if (e.beta != null) tilt.feed(e); });
-addEventListener('keydown', e => { keys[e.key] = true; });
+addEventListener('keydown', e => { keys[e.key] = true; if ((e.key === '1' || e.key === '2') && run && useSlot(run, +e.key - 1)) sound.coat(); });   // number keys stand in for the slots on a computer
 addEventListener('keyup', e => { keys[e.key] = false; });
 addEventListener('resize', () => view.resize());
 
@@ -36,8 +37,8 @@ function load(id) {
   const ls = levelsFor(save.diff), level = ls.find(l => l.id === id) || ls[0];
   run = createRun(level, save.diff); view.load(level); theme();
 }
-function goHome() { mode = 'home'; if (!run) load(save.prog[save.diff].reached); ui.show('home', { save, notice }); }
-function ready() { mode = 'ready'; ui.show('ready', { level: run.level }); ui.hud(run); }
+function goHome() { mode = 'home'; save = markOpened(save); keep(); if (!run) load(reachedOf(save, save.diff)); ui.show('home', { save, notice }); }
+function ready() { mode = 'ready'; ui.show('ready', { level: run.level, slots: run.slots }); ui.hud(run); }
 
 const ui = createUI(document.body, {
   async play(id) { await unlock(); stayAwake(); load(id); ready(); },
@@ -53,6 +54,12 @@ const ui = createUI(document.body, {
   closeSettings() { ui.closeSettings(); if (mode === 'home') goHome(); },
   setOpt(k, v) { save.opt = { ...save.opt, [k]: v }; keep(); if (k === 'dark') theme(); },
   zero() { tilt.calibrate(); ui.toast(T.zeroDone); },
+  useSlot(i) { if (run && useSlot(run, i)) sound.coat(); },
+  cycleSlot(i) {   // empty → each owned element → empty
+    const opts = [null, ...ownedFor(run.level.world)], next = opts[(opts.indexOf(run.slots[i]) + 1) % opts.length], sl = [...run.slots];
+    sl[i] = next; if (next && sl[1 - i] === next) sl[1 - i] = null;   // one element is worn from one slot
+    setSlots(run, sl); ready();
+  },
 });
 
 function showRest() { mode = 'rest'; ui.show('rest', { left: run.restLeft, canSkip: save.coins >= 20 }); }
@@ -75,11 +82,12 @@ function frame(now) {
       else if (e.type === 'break') sound.crash();
       else if (e.type === 'coin') sound.ding();
       else if (e.type === 'hole') sound.plop();
+      else if (e.type === 'douse') sound.hiss();
     }
     if (mode === 'play') {
       ui.hud(run);
       if (run.phase === 'clear') {
-        clearOut = afterClear(save, run); save = clearOut.save; keep(); sound.win();
+        clearOut = afterClear(save, run); save = markOpened(clearOut.save); keep(); sound.win();
         mode = 'clear'; ui.show('clear', clearOut);
       } else if (run.phase === 'fail') { sound.fail(); mode = 'fail'; ui.show('fail', { reason: run.reason }); }
     }
@@ -104,10 +112,10 @@ if (shot) {
   } else {
     load(shot[1]);
     if (s === 'ready') ready();
-    else { startRun(run); mode = 'play'; ui.show('play', { level: run.level }); run.left *= 0.7; run.coins = 2; ui.hud(run); }
+    else { startRun(run); mode = 'play'; ui.show('play', { level: run.level }); run.left *= 0.7; run.coins = 2; if (tok.has('coat')) { useSlot(run, 0); run.coat.left = 3.2; } ui.hud(run); }
     if (s === 'pause') ui.show('pause');
     if (s === 'clear') { clearOut = { stars: 2, reward: 17, next: levelById('w1-4') }; ui.show('clear', clearOut); }
-    if (s === 'fail') ui.show('fail', { reason: tok.has('normal') ? 'trap' : 'timeout' });
+    if (s === 'fail') ui.show('fail', { reason: run.level.fires ? 'fire' : tok.has('normal') ? 'trap' : 'timeout' });
     if (s === 'rest') { run.phase = 'rest'; run.restLeft = 24; ui.show('rest', { left: 24, canSkip: true }); }
     if (s === 'settings') ui.show('settings', { opt: save.opt });
     if (s !== 'play' && s !== 'ready') mode = 'shot';
