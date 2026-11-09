@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { defaultSave, loadSave, writeSave, recordClear, isOpen } from '../src/save.js';
+import { defaultSave, loadSave, writeSave, recordClear, isOpen, markOpened, reachedOf } from '../src/save.js';
+import { nextLevel } from '../src/levels/index.js';
 
 const mem = () => { const m = {}; return { getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, m }; };
 const KEY = 'tilt-maze:v1';
@@ -46,5 +47,21 @@ describe('save', () => {
     s.prog.easy.best = fields(9); expect(isOpen(s, 'normal')).toBe(false);
     s.prog.easy.best = fields(10); expect(isOpen(s, 'normal')).toBe(true);
     expect(isOpen(s, 'hard')).toBe(false);
+  });
+  it('the furthest stage moves past every stage already cleared', () => {
+    const s = defaultSave(); s.prog.easy.best = { t1: { stars: 1, time: 9 }, t2: { stars: 1, time: 9 } };
+    expect(reachedOf(s, 'easy')).toBe('t3');
+    s.prog.easy.best = { ...s.prog.easy.best, t3: { stars: 1, time: 9 }, ...fields(10) }; s.prog.easy.reached = 'w1-10';
+    expect(reachedOf(s, 'easy')).toBe(nextLevel('w1-10', 'easy')?.id ?? 'w1-10');   // a world added later opens after the last cleared
+  });
+  it('a difficulty once open stays open when stages are added', () => {
+    const st = mem(), old = defaultSave(); delete old.opened; old.prog.easy.best = fields(10);
+    st.setItem(KEY, JSON.stringify(old));
+    const s = loadSave(st); expect(s.opened).toContain('normal');
+    s.prog.easy.best = fields(3); expect(isOpen(s, 'normal')).toBe(true);
+  });
+  it('marks what has come open', () => {
+    const s = defaultSave(); expect(s.opened).toEqual(['easy']);
+    s.prog.easy.best = fields(10); expect(markOpened(s).opened).toEqual(['easy', 'normal']);
   });
 });
