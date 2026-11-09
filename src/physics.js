@@ -15,12 +15,16 @@ export function createBall(x, y) { return { x, y, vx: 0, vy: 0, fall: 0 }; }
 // trap {trap} then lost, at a fire pillar douse {fire} (the ball wears water) or burn {fire} (it does not), burnwall
 // {wall} (fire takes a vine or ice wall), light {torch} (fire lights a torch and its door opens), cool {lava} (water
 // turns lava to stone) or lava {lava} (the ball sinks in), quench (fire worn into a puddle goes out), and in deep
-// water freeze {deep} (ice turns it to a slippery bridge) or drown {deep}.
+// water freeze {deep} (ice turns it to a slippery bridge) or drown {deep}, shock (an electric fence, or the electric
+// floor while it is on), power {sw} (electricity worn turns a switch on: its fences go off, its doors open), and caught
+// (an enemy reached the ball).
 // `coat` is the element the ball wears this frame, or null.
 export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   const ev = [];
   if (ball.burnt) return ev;
-  state.doused ??= new Set(); state.lit ??= new Set(); state.cooled ??= new Set(); state.frozen ??= new Set();
+  state.doused ??= new Set(); state.lit ??= new Set(); state.cooled ??= new Set(); state.frozen ??= new Set(); state.powered ??= new Set();
+  state.clock = (state.clock || 0) + dt;
+  const shock = () => { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'shock' }); return ev; };
   dt = Math.min(dt, 1 / 30);   // after a pause the frame gap can be long; a long step would carry the ball through walls
   if (ball.fall > 0) {   // dropping: drawn toward the middle of the hole until it is gone
     const h = ball.into, k = Math.min(1, dt * 10);
@@ -42,6 +46,13 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
     ball.x += ball.vx * h; ball.y += ball.vy * h;
     for (const w of RIM_WALLS) collide(ball, w, -1, ev);
     level.walls.forEach((w, i) => { if (!state.broken.has(i)) collide(ball, w, i, ev, state, coat); });
+    if (ball.burnt) return ev;   // an electric fence
+    (level.switches || []).forEach((w, i) => {
+      if (coat !== 'spark' || state.powered.has(i) || Math.hypot(ball.x - w.x, ball.y - w.y) >= R + 2.5) return;
+      state.powered.add(i); for (const d of w.open) state.broken.add(d); ev.push({ type: 'power', sw: i });
+    });
+    const on = state.clock % 4 < 2;   // the electric floor: two seconds on, two off
+    for (const z of level.zaps || []) if (inside(z) && coat !== 'spark' && (on || coat === 'water')) return shock();
     (level.torches || []).forEach((t, i) => {
       if (coat !== 'fire' || state.lit.has(i) || Math.hypot(ball.x - t.x, ball.y - t.y) >= R + 2.5) return;
       state.lit.add(i); state.broken.add(t.door); ev.push({ type: 'light', torch: i });
@@ -67,6 +78,7 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
       else { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'burn', fire: f }); return ev; }
     }
   }
+  if (level.enemies?.length && chase(ball, level, state, dt, coat)) { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'caught' }); return ev; }
   level.coins.forEach((c, i) => {
     if (!state.got.has(i) && Math.hypot(ball.x - c.x, ball.y - c.y) < R + 3) { state.got.add(i); ev.push({ type: 'coin', coin: i }); }
   });
@@ -89,6 +101,7 @@ function collide(ball, w, i, ev, state, coat) {
   if (d >= R) return;
   if (d === 0) { dx = 0; dy = -1; d = 1; }
   const nx = dx / d, ny = dy / d, vn = ball.vx * nx + ball.vy * ny;
+  if (w.kind === 'fence') { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'shock' }); return; }
   if ((w.kind === 'vine' || w.kind === 'ice') && coat === 'fire') { state.broken.add(i); ev.push({ type: 'burnwall', wall: i }); return; }   // burnt or melted away
   if (vn >= 0) { ball.x += nx * (R - d); ball.y += ny * (R - d); return; }   // already moving away: just step out
   if (w.kind === 'crack' && -vn > FEEL.brk) {   // fast enough: the cracked wall gives way
@@ -98,4 +111,48 @@ function collide(ball, w, i, ev, state, coat) {
   ball.x += nx * (R - d); ball.y += ny * (R - d);
   ball.vx -= (1 + FEEL.bounce) * vn * nx; ball.vy -= (1 + FEEL.bounce) * vn * ny;
   ev.push({ type: 'knock', speed: -vn });
+}
+
+// Enemies follow the maze toward the ball, on a 2-unit grid: each frame they step to the neighbouring cell nearest the
+// ball by the way round the walls (or, from a ball wearing fire, the one furthest). Returns true when one reaches it.
+const FOE_R = 3.5, CELL = 2, GW = BW / CELL, GH = BH / CELL;
+function chase(ball, level, state, dt, coat) {
+  state.foes ??= level.enemies.map(e => ({ x: e.x, y: e.y, speed: e.speed ?? 28 }));
+  const key = state.broken.size;
+  if (!state.foeGrid || state.foeGrid.key !== key) {   // where an enemy fits: away from every standing wall
+    const solid = level.walls.filter((w, i) => !state.broken.has(i)), open = new Uint8Array(GW * GH);
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+      const x = (gx + 0.5) * CELL, y = (gy + 0.5) * CELL;
+      open[gy * GW + gx] = x > RIM + FOE_R && x < BW - RIM - FOE_R && y > RIM + FOE_R && y < BH - RIM - FOE_R && solid.every(w => Math.hypot(x - Math.max(w.x, Math.min(x, w.x + w.w)), y - Math.max(w.y, Math.min(y, w.y + w.h))) >= FOE_R) ? 1 : 0;
+    }
+    state.foeGrid = { key, open, dist: null, at: -1 };
+  }
+  const G = state.foeGrid, cell = (x, y) => Math.min(GH - 1, Math.max(0, Math.floor(y / CELL))) * GW + Math.min(GW - 1, Math.max(0, Math.floor(x / CELL)));
+  if (!G.dist || state.clock - G.at > 0.2) {   // distance from the ball, through open cells
+    const dist = new Int32Array(GW * GH).fill(-1), q = [cell(ball.x, ball.y)]; dist[q[0]] = 0;
+    for (let k = 0; k < q.length; k++) {
+      const c = q[k], cx = c % GW, cy = (c / GW) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cx + dx, ny = cy + dy, n = ny * GW + nx;
+        if (nx < 0 || ny < 0 || nx >= GW || ny >= GH || dist[n] >= 0 || !G.open[n]) continue;
+        dist[n] = dist[c] + 1; q.push(n);
+      }
+    }
+    G.dist = dist; G.at = state.clock;
+  }
+  const away = coat === 'fire';
+  let caught = false;
+  for (const f of state.foes) {
+    const c = cell(f.x, f.y), cx = c % GW, cy = (c / GW) | 0;
+    let best = null, bd = away ? -1 : Infinity;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const nx = cx + dx, ny = cy + dy, n = ny * GW + nx;
+      if ((dx || dy) && nx >= 0 && ny >= 0 && nx < GW && ny < GH && G.open[n] && G.dist[n] >= 0 && (away ? G.dist[n] > bd : G.dist[n] < bd)) { bd = G.dist[n]; best = [(nx + 0.5) * CELL, (ny + 0.5) * CELL]; }
+    }
+    const [tx, ty] = !away && G.dist[c] <= 1 ? [ball.x, ball.y] : best || [f.x, f.y];
+    const d = Math.hypot(tx - f.x, ty - f.y), step = Math.min(d, f.speed * dt);
+    if (d > 0) { f.x += (tx - f.x) / d * step; f.y += (ty - f.y) / d * step; }
+    if (!away && Math.hypot(ball.x - f.x, ball.y - f.y) < R + FOE_R) caught = true;
+  }
+  return caught;
 }

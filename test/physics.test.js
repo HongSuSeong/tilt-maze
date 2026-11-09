@@ -130,4 +130,34 @@ describe('physics', () => {
     expect(ev.some(e => e.type === 'freeze' && e.deep === 0)).toBe(true); expect(ev.some(e => e.type === 'drown')).toBe(false);
     expect(s.frozen.has(0)).toBe(true); expect(b.x).toBeGreaterThan(70);
   });
+  it('an electric fence shocks', () => {
+    const b = createBall(40, 80), ev = roll(b, { x: 8, y: 0 }, 2, lv({ walls: [{ x: 60, y: 60, w: 4, h: 40, kind: 'fence' }] }), fresh(), 'fire');
+    expect(ev.some(e => e.type === 'shock')).toBe(true); expect(b.x).toBeLessThan(60);
+  });
+  it('a switch touched with electricity turns its fence off', () => {
+    const level = lv({ walls: [{ x: 70, y: 60, w: 4, h: 40, kind: 'fence' }], switches: [{ x: 50, y: 80, open: [0] }] });
+    const s = fresh(), b = createBall(30, 80), ev = roll(b, { x: 8, y: 0 }, 2, level, s, 'spark');
+    expect(ev.some(e => e.type === 'power' && e.sw === 0)).toBe(true); expect(ev.some(e => e.type === 'shock')).toBe(false); expect(b.x).toBeGreaterThan(74);
+  });
+  it('the electric floor shocks while on, not while off, and never a ball wearing electricity', () => {
+    const zap = { zaps: [{ x: 40, y: 60, w: 20, h: 40 }] };
+    const on = roll(createBall(50, 80), { x: 0, y: 0 }, 0.2, lv(zap), fresh(), null);   // on for the first two seconds
+    expect(on.some(e => e.type === 'shock')).toBe(true);
+    const s = fresh(); s.clock = 2.5;   // off from two to four
+    expect(roll(createBall(50, 80), { x: 0, y: 0 }, 0.2, lv(zap), s, null).some(e => e.type === 'shock')).toBe(false);
+    expect(roll(createBall(50, 80), { x: 0, y: 0 }, 0.2, lv(zap), fresh(), 'spark').some(e => e.type === 'shock')).toBe(false);
+    const w = fresh(); w.clock = 2.5;
+    expect(roll(createBall(50, 80), { x: 0, y: 0 }, 0.2, lv(zap), w, 'water').some(e => e.type === 'shock')).toBe(true);   // water carries it even off
+  });
+  it('an enemy comes after the ball and catches it', () => {
+    const level = lv({ enemies: [{ x: 50, y: 130, speed: 28 }] }), s = fresh(), b = createBall(50, 40);
+    roll(b, { x: 0, y: 0 }, 1, level, s, null);
+    expect(s.foes[0].y).toBeLessThan(130 - 20);
+    const ev = roll(b, { x: 0, y: 0 }, 6, level, s, null);
+    expect(ev.some(e => e.type === 'caught')).toBe(true);
+  });
+  it('an enemy backs away from a ball wearing fire', () => {
+    const s = fresh(); roll(createBall(50, 60), { x: 0, y: 0 }, 1, lv({ enemies: [{ x: 50, y: 100, speed: 28 }] }), s, 'fire');
+    expect(s.foes[0].y).toBeGreaterThan(100);
+  });
 });
