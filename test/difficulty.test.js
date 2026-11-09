@@ -18,11 +18,15 @@ describe('difficulty', () => {
     expect(n.walls[0].x).toBe(3);
   });
   it('normal has no practice stages', () => {
-    expect(levelsFor('normal').map(l => l.id)).toEqual([1, 2, 3, 4].flatMap(w => Array.from({ length: 10 }, (_, i) => `w${w}-${i + 1}`)));
+    expect(levelsFor('normal').map(l => l.id)).toEqual([1, 2, 3, 4, 5].flatMap(w => Array.from({ length: 10 }, (_, i) => `w${w}-${i + 1}`)));
     expect(levelsFor('easy')[0].id).toBe('t1');
   });
   it('the next stage follows the chosen difficulty', () => {
-    expect(nextLevel('t3', 'easy').id).toBe('w1-1'); expect(nextLevel('w4-10', 'normal')).toBe(null);
+    expect(nextLevel('t3', 'easy').id).toBe('w1-1'); expect(nextLevel('w5-10', 'normal')).toBe(null);
     expect(nextLevel('w1-2', 'normal').time).toBe(Math.round(levelById('w1-3').time * 0.75));
+  });
+  it('enemies run a quarter faster on normal', () => {
+    const l = { id: 'e', world: 5, time: 40, walls: [], enemies: [{ x: 10, y: 10, speed: 20 }] };
+    expect(applyDifficulty(l, 'normal').enemies[0].speed).toBe(25); expect(applyDifficulty(l, 'easy').enemies[0].speed).toBe(20);
   });
 });

@@ -12,7 +12,7 @@ describe('after a stage is cleared', () => {
     expect(out.save.prog.easy.reached).toBe('w1-2'); expect(out.next.id).toBe('w1-2');
   });
   it('after the last stage there is nothing next: back home', () => {
-    const r = createRun(levelById('w4-10')); r.left = 1;
+    const r = createRun(levelById('w5-10')); r.left = 1;
     expect(afterClear(defaultSave(), r).next).toBe(null);
   });
   it('records under the difficulty played', () => {

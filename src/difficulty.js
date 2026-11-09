@@ -16,7 +16,10 @@ function thicker(w) {
 
 export function applyDifficulty(level, diff) {
   if (diff !== 'normal') return level;
-  return { ...level, time: Math.round(level.time * 0.75), walls: level.walls.map(thicker), traps: level.normal?.traps || [], ...(level.normal?.coins && { coins: level.normal.coins }) };
+  return {
+    ...level, time: Math.round(level.time * 0.75), walls: level.walls.map(thicker), traps: level.normal?.traps || [], ...(level.normal?.coins && { coins: level.normal.coins }),
+    ...(level.enemies && { enemies: level.enemies.map(e => ({ ...e, speed: (e.speed ?? 28) * 1.25 })) }),   // and the enemies a quarter faster
+  };
 }
 
 // the stages of a difficulty in playing order: practice belongs to easy only
