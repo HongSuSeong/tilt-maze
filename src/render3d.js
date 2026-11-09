@@ -17,8 +17,9 @@ const PALETTE = {
 const WORLD_TINT = {
   2: { light: { bg: '#EAF4FB', floor: '#CDEBFA', dot: '#B5DDF4', ring: '#7FC4E8' }, dark: { bg: '#0E1A22', floor: '#142630', dot: '#1E3A48', ring: '#6FD0FF' } },
   3: { light: { bg: '#FFF1E6', floor: '#FFE2CC', dot: '#FFD0AE', ring: '#FFB48A' }, dark: { bg: '#1A1210', floor: '#2A1A14', dot: '#3A2418', ring: '#FFB48A' } },
+  4: { light: { bg: '#F2F8FC', floor: '#E3F1F8', dot: '#CFE6F2', ring: '#8FD8F0' }, dark: { bg: '#0D161C', floor: '#16242C', dot: '#22343E', ring: '#8FD8F0' } },
 };
-const ELEMENT_COLOR = { water: '#5BB8F5', fire: '#FF7A45' };
+const ELEMENT_COLOR = { water: '#5BB8F5', fire: '#FF7A45', ice: '#8FD8F0' };
 
 function canvasTex(w, h, paint) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
@@ -69,6 +70,8 @@ export function createView(container) {
     lava: new THREE.MeshStandardMaterial({ color: '#FF8A55', emissive: '#FF5A1E', emissiveIntensity: 0.9, roughness: 0.4 }),
     stone: new THREE.MeshStandardMaterial({ color: '#8C8580', roughness: 0.95 }),
     post: new THREE.MeshStandardMaterial({ color: '#6B4A35', roughness: 0.8 }),
+    slick: new THREE.MeshStandardMaterial({ color: '#F4FBFF', roughness: 0.04, metalness: 0.25, transparent: true, opacity: 0.85 }),
+    deep: new THREE.MeshStandardMaterial({ color: '#2F7FB8', roughness: 0.1, metalness: 0.1 }),
   };
   const WALL_MAT = { wall: mat.wall, crack: mat.crack, vine: mat.vine, ice: mat.ice, door: mat.door };
   const board = new THREE.Group(); scene.add(board);
@@ -76,7 +79,7 @@ export function createView(container) {
   const coat = new THREE.Mesh(new THREE.SphereGeometry(R * U * 1.28, 32, 20), mat.coat); coat.visible = false;   // the element the ball wears
   const trail = Array.from({ length: 24 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), mat.trail.clone()); m.visible = false; return { m, t: 9 }; });
   const bitGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16), coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 28);
-  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], trailI = 0, dark = false, clock = 0;
+  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
 
   function paint() {
@@ -97,7 +100,7 @@ export function createView(container) {
 
   function clear() {
     for (const o of [...board.children]) { board.remove(o); if (o !== ball && !trail.some(t => t.m === o) && o.geometry !== coinGeo && o.geometry !== bitGeo) o.geometry?.dispose(); }
-    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = [];
+    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = []; deeps = [];
   }
 
   function load(lv) {
@@ -124,6 +127,9 @@ export function createView(container) {
       const core = new THREE.Mesh(new THREE.ConeGeometry(f.r * U * 0.4, 0.9, 14), mat.core); core.position.y = 0.6; g.add(core);
       board.add(g); return { g, flame, core, f };
     });
+    const flat = (r, m, y) => { const g = new THREE.Mesh(roundRect(r.w * U, r.h * U, Math.min(r.w, r.h) * U * 0.25), m); g.rotation.x = -Math.PI / 2; g.position.set(X(r.x + r.w / 2), y, Z(r.y + r.h / 2)); g.receiveShadow = true; board.add(g); return g; };
+    for (const r of lv.slick || []) flat(r, mat.slick, 0.006);
+    deeps = (lv.deep || []).map(r => flat(r, mat.deep, 0.009));
     lavas = (lv.lava || []).map(L => {
       const m = new THREE.Mesh(roundRect(L.w * U, L.h * U, Math.min(L.w, L.h) * U * 0.3), mat.lava); m.rotation.x = -Math.PI / 2; m.position.set(X(L.x + L.w / 2), 0.012, Z(L.y + L.h / 2)); board.add(m); return m;
     });
@@ -167,8 +173,10 @@ export function createView(container) {
       if (e.type === 'break' || e.type === 'burnwall') shatter(e.wall, b);
       if (e.type === 'douse') steam(level.fires[e.fire]);
       if (e.type === 'cool') { const L = level.lava[e.lava]; steam({ x: L.x + L.w / 2, y: L.y + L.h / 2 }); }
+      if (e.type === 'freeze') { const D = level.deep[e.deep]; steam({ x: D.x + D.w / 2, y: D.y + D.h / 2 }); }
     }
     lavas.forEach((m, i) => { m.material = run.state.cooled?.has(i) ? mat.stone : mat.lava; });
+    deeps.forEach((m, i) => { m.material = run.state.frozen?.has(i) ? mat.slick : mat.deep; });
     torches.forEach((t, i) => { t.flame.visible = !!run.state.lit?.has(i); t.flame.scale.set(1, 1 + 0.15 * Math.sin(clock * 11 + i), 1); });
     mat.lava.emissiveIntensity = 0.75 + 0.25 * Math.sin(clock * 3.8);
     fires.forEach((F, i) => {   // flames sway; put out, only the vent is left

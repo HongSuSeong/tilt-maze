@@ -10,7 +10,8 @@ const PAUSE = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true
 const LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:4px;vertical-align:-1px"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>';
 const DROP = c => `<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z" fill="${c}" stroke="#2F7FB8" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
 const FLAME = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5 .3 1.6 1 2.6 2 3-.5-2.8.2-5.6.5-8z" fill="#FFB36B" stroke="#E2552E" stroke-width="1.6" stroke-linejoin="round"/></svg>';
-const ICON = { water: DROP('#BFE7FF'), fire: FLAME };
+const FLAKE = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#3E9EDB" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5"/></svg>';
+const ICON = { water: DROP('#BFE7FF'), fire: FLAME, ice: FLAKE };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function createUI(root, h) {
