@@ -160,4 +160,18 @@ describe('physics', () => {
     const s = fresh(); roll(createBall(50, 60), { x: 0, y: 0 }, 1, lv({ enemies: [{ x: 50, y: 100, speed: 28 }] }), s, 'fire');
     expect(s.foes[0].y).toBeGreaterThan(100);
   });
+  it('a thick wall holds against anything but stone', () => {
+    const level = lv({ walls: [{ x: 20, y: 38, w: 6, h: 28, kind: 'thick' }] });
+    const fast = createBall(90, 52); expect(roll(fast, { x: -25, y: 0 }, 1.5, level, fresh(), null).some(e => e.type === 'break')).toBe(false);
+    const s = fresh(), heavy = createBall(45, 52); roll(heavy, { x: -10, y: 0 }, 1.5, level, s, 'stone');
+    expect(s.broken.has(0)).toBe(true);
+  });
+  it('stone breaks a cracked wall from a short roll', () => {
+    const s = fresh(); roll(createBall(45, 52), { x: -10, y: 0 }, 1.5, lv({ walls: [{ x: 20, y: 38, w: 6, h: 28, kind: 'crack' }] }), s, 'stone');
+    expect(s.broken.has(0)).toBe(true);
+  });
+  it('a ball of stone sinks in a puddle', () => {
+    const b = createBall(30, 80), ev = roll(b, { x: 8, y: 0 }, 2, lv({ pools: [{ x: 50, y: 60, w: 20, h: 40 }] }), fresh(), 'stone');
+    expect(ev.some(e => e.type === 'drown')).toBe(true);
+  });
 });

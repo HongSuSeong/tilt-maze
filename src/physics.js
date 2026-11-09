@@ -7,7 +7,8 @@ const RIM_WALLS = [
   { x: 0, y: 0, w: BW, h: RIM }, { x: 0, y: BH - RIM, w: BW, h: RIM },
   { x: 0, y: 0, w: RIM, h: BH }, { x: BW - RIM, y: 0, w: RIM, h: BH },
 ];
-const FALL_DONE = 1.1;   // seconds from dropping into the hole to the stage being over
+const FALL_DONE = 1.1;
+const STONE_BRK = 60;   // a ball of stone is heavy: a short roll breaks cracked and thick walls   // seconds from dropping into the hole to the stage being over
 
 export function createBall(x, y) { return { x, y, vx: 0, vy: 0, fall: 0 }; }
 
@@ -39,6 +40,7 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   const deep = level.deep || [], icy = (level.slick || []).some(r => inside(r)) || deep.some((r, i) => state.frozen.has(i) && inside(r));
   const fric = FEEL.fric * (wet ? 5 : icy ? 0.1 : 1);   // a puddle holds the ball back; ice hardly does
   if (wet && coat === 'fire') { coat = null; ev.push({ type: 'quench' }); }   // ...and puts fire out
+  if (wet && coat === 'stone') { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'drown' }); return ev; }   // a ball of stone sinks
   for (let i = 0; i < FEEL.sub; i++) {
     ball.vx += ax * h; ball.vy += ay * h;
     const damp = Math.exp(-fric * h); ball.vx *= damp; ball.vy *= damp;
@@ -104,7 +106,8 @@ function collide(ball, w, i, ev, state, coat) {
   if (w.kind === 'fence') { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'shock' }); return; }
   if ((w.kind === 'vine' || w.kind === 'ice') && coat === 'fire') { state.broken.add(i); ev.push({ type: 'burnwall', wall: i }); return; }   // burnt or melted away
   if (vn >= 0) { ball.x += nx * (R - d); ball.y += ny * (R - d); return; }   // already moving away: just step out
-  if (w.kind === 'crack' && -vn > FEEL.brk) {   // fast enough: the cracked wall gives way
+  const need = coat === 'stone' ? STONE_BRK : w.kind === 'crack' ? FEEL.brk : Infinity;   // a thick wall gives way only to stone
+  if ((w.kind === 'crack' || w.kind === 'thick') && -vn > need) {   // fast enough: the wall gives way
     state.broken.add(i); ev.push({ type: 'break', wall: i });
     ball.vx *= FEEL.keep; ball.vy *= FEEL.keep; return;
   }
