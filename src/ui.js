@@ -48,22 +48,22 @@ export function createUI(root, h) {
   let diffName = '';
   const label = l => { $('hudWorld').textContent = T.worlds[l.world] + (diffName ? ` · ${diffName}` : ''); $('hudStage').textContent = T.stage(l); };
 
-  function home({ save, notice }) {
+  function home({ save, notice, unlock }) {
     const diff = save.diff, ls = levelsFor(diff), p = save.prog[diff], at = Math.max(0, ls.findIndex(l => l.id === reachedOf(save, diff)));
     diffName = DIFFS.find(d => d.id === diff).name;
     const chip = d => {
-      const open = isOpen(save, d.id);
+      const open = unlock ? BUILT.includes(d.id) : isOpen(save, d.id);
       return `<button class="chip" data-diff="${d.id}" aria-pressed="${d.id === diff}" ${open ? '' : 'data-locked="1"'} aria-label="${d.name}${open ? '' : ', ' + T.locked}">${open ? '' : LOCK}${d.name}</button>`;
     };
     const cell = (l, i) => {
-      const best = p.best[l.id], open = i <= at;
+      const best = p.best[l.id], open = unlock || i <= at;
       return `<button data-id="${l.id}" ${open ? '' : 'disabled'} aria-label="${esc(l.name)}${open ? '' : ', ' + T.locked}">${l.index}<small class="${best ? '' : 'none'}">${'★'.repeat(best?.stars || 0)}${'☆'.repeat(3 - (best?.stars || 0))}</small></button>`;
     };
     const worlds = [...new Set(ls.map(l => l.world))];
     const group = w => `<section><h3>${T.worlds[w]}</h3><div class="grid">${ls.map((l, i) => [l, i]).filter(([l]) => l.world === w).map(([l, i]) => cell(l, i)).join('')}</div></section>`;
     $('home').innerHTML = `<div class="inner">
       <header><h1>${T.title}</h1><span class="purse"><span class="coin"></span>${save.coins}</span></header>
-      ${notice ? `<p class="notice">${esc(notice)}</p>` : ''}
+      ${notice ? `<p class="notice">${esc(notice)}</p>` : ''}${unlock ? `<p class="notice">${T.unlockNote}</p>` : ''}
       <div class="chips" role="group" aria-label="${T.diffPick}">${DIFFS.map(chip).join('')}</div>
       <div class="row2"><button class="go" data-id="${ls[at].id}">${T.continue} · ${esc(ls[at].name)}</button><button data-do="openSettings">${T.settings}</button></div>
       ${worlds.map(group).join('')}

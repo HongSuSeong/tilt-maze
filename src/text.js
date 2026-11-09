@@ -11,6 +11,7 @@ export const T = {
   resume: '계속하기', retry: '다시 하기', home: '처음 화면으로',
   clear: '통과!', reward: n => `코인 +${n}`, next: '다음 단계', lastDone: '들판을 모두 깼어요! 다음 세계는 곧 열려요.',
   fail: { timeout: '시간이 다 됐어요', trap: '함정 구멍에 빠졌어요', fire: '불기둥에 닿았어요', lava: '용암에 빠졌어요', drown: '깊은 물에 빠졌어요', shock: '전기에 감전됐어요', caught: '적에게 잡혔어요', fall: '틈으로 떨어졌어요' }, quench: '물에 닿아 불이 꺼졌어요',
+  unlockNote: '시험용: 모든 난이도와 단계가 열려 있어요 (주소의 ?unlock을 지우면 원래대로)',
   diffLocked: '앞 난이도의 단계를 모두 깨면 열려요', diffSoon: '곧 열려요', diffPick: '난이도',
   rest: '잠깐 쉬어요', restWhy: '같은 단계를 세 번 놓쳤어요.', restLeft: s => `${s}초`, restLater: '뒤에 다시 할 수 있어요', restSkip: '코인 10개로 바로 하기',
   sens: '민감도', sensNote: '같은 기울기에서 공이 얼마나 빨리 구르는지 정합니다.',

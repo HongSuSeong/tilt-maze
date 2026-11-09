@@ -7,13 +7,14 @@ import { createSound } from './sound.js';
 import { T } from './text.js';
 import { levelById } from './levels/index.js';
 import { levelsFor } from './difficulty.js';
-import { loadSave, writeSave, markOpened, reachedOf } from './save.js';
+import { loadSave, writeSave, markOpened, reachedOf, isOpen } from './save.js';
 import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear, useSlot, setSlots, SKIP_COST } from './run.js';
 import { ownedFor } from './elements.js';
 
 let save = loadSave();
 const tilt = createTilt(), keys = {}, view = createView(document.body), sound = createSound(() => save.opt);
 let run = null, mode = 'home', unlocked = false, notice = '', wake = null;
+const unlockAll = new URLSearchParams(location.search).has('unlock');   // for trying any stage: opens everything built, keeps none of it
 const keep = () => writeSave(save);
 const angle = () => (window.screen.orientation?.angle ?? window.orientation ?? 0);
 const theme = () => { document.documentElement.dataset.theme = save.opt.dark ? 'dark' : 'light'; view.setDark(save.opt.dark); };
@@ -37,7 +38,11 @@ function load(id) {
   const ls = levelsFor(save.diff), level = ls.find(l => l.id === id) || ls[0];
   run = createRun(level, save.diff); view.load(level); theme();
 }
-function goHome() { mode = 'home'; save = markOpened(save); keep(); if (!run) load(reachedOf(save, save.diff)); ui.show('home', { save, notice }); }
+function goHome() {
+  mode = 'home'; save = markOpened(save);
+  if (!unlockAll && !isOpen(save, save.diff)) save = { ...save, diff: 'easy' };   // a difficulty chosen while unlocked is not kept open
+  keep(); if (!run) load(reachedOf(save, save.diff)); ui.show('home', { save, notice, unlock: unlockAll });
+}
 function ready() { mode = 'ready'; ui.show('ready', { level: run.level, slots: run.slots }); ui.hud(run); }
 
 const ui = createUI(document.body, {
