@@ -45,7 +45,8 @@ const ballTex = () => canvasTex(512, 256, (g, w, h) => {   // coral with cream d
   g.fillStyle = '#FFA396'; g.fillRect(0, h / 2 - 6, w, 12);
 });
 
-// Molten rock: dark crust drifting on a glowing flow, warped noise in the board's own coordinates so pools match up.
+// Lava in the soft-toy look: a glossy orange jelly with pale round blobs drifting slowly across it and a soft sheen,
+// smooth low-frequency noise only, so it sits with the rounded blocks rather than looking like real rock.
 function lavaMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 } },
@@ -55,16 +56,13 @@ function lavaMaterial() {
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p) { vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
-      float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return v; }
       void main() {
-        vec2 p = vP * 1.7;
-        vec2 q = vec2(fbm(p + uTime * 0.07), fbm(p + vec2(5.2, 1.3) - uTime * 0.05));
-        float n = fbm(p + 2.2 * q + vec2(uTime * 0.04, -uTime * 0.03));
-        float crust = smoothstep(0.47, 0.56, n);                               // cooled plates riding on the flow
-        float seam = 1.0 - smoothstep(0.0, 0.035, abs(n - 0.5));               // the bright edge where a plate cracks
-        vec3 hot = mix(vec3(1.0, 0.5, 0.08), vec3(0.62, 0.07, 0.01), smoothstep(0.3, 0.5, n));   // linear colours: they brighten on output
-        vec3 col = mix(hot, vec3(0.035, 0.008, 0.004), crust) + vec3(1.0, 0.32, 0.03) * seam * 0.9;
-        col *= 0.9 + 0.1 * sin(uTime * 2.3 + n * 14.0);                        // it breathes
+        vec2 p = vP * 0.9;
+        float n = noise(p + vec2(uTime * 0.16, uTime * 0.1)) * 0.6 + noise(p * 1.7 - uTime * 0.12) * 0.4;
+        float blob = smoothstep(0.6, 0.68, n);                                   // pale round spots, soft-edged
+        vec3 col = mix(vec3(1.0, 0.195, 0.045), vec3(1.0, 0.56, 0.15), blob);    // #FF7A3C and #FFC56B, in linear
+        float sheen = smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(vP.x * 0.7 + vP.y * 0.5 + uTime * 0.7));
+        col += vec3(0.35, 0.25, 0.15) * sheen * 0.35;                            // a gloss passing over it
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
       }`,
@@ -100,12 +98,12 @@ export function createView(container) {
     ice: new THREE.MeshStandardMaterial({ color: '#CFEFFF', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.78 }),
     door: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#B07A4F'; g.fillRect(0, 0, w, h); g.fillStyle = '#8A5A36'; for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 4, h); }), roughness: 0.7 }),
     lava: lavaMaterial(),
-    stone: new THREE.MeshStandardMaterial({ map: canvasTex(256, 256, (g, w, h) => {   // lava gone cold: dark basalt, cracked
-      g.fillStyle = '#4A403C'; g.fillRect(0, 0, w, h); g.strokeStyle = '#6E625B'; g.lineWidth = 3;
-      for (let i = 0; i < 22; i++) { let x = (i * 71) % w, y = (i * 113) % h; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 4; k++) { x += ((i * 7 + k * 13) % 41) - 20; y += ((i * 11 + k * 17) % 41) - 20; g.lineTo(x, y); } g.stroke(); }
-    }), roughness: 0.95 }),
-    rim: new THREE.MeshStandardMaterial({ color: '#3A2A24', roughness: 0.9 }),
-    bubble: new THREE.MeshBasicMaterial({ color: '#FFB347' }),
+    stone: new THREE.MeshStandardMaterial({ map: canvasTex(256, 256, (g, w, h) => {   // lava gone cold: soft grey pebbles
+      g.fillStyle = '#C2B8B0'; g.fillRect(0, 0, w, h); g.fillStyle = '#AEA39A';
+      for (let i = 0; i < 26; i++) { g.beginPath(); g.ellipse((i * 71) % w, (i * 113) % h, 14 + (i % 3) * 6, 10 + (i % 4) * 4, i, 0, 7); g.fill(); }
+    }), roughness: 0.85 }),
+    rim: new THREE.MeshStandardMaterial({ color: '#E0784A', roughness: 0.6 }),
+    bubble: new THREE.MeshStandardMaterial({ color: '#FFD089', emissive: '#FFB347', emissiveIntensity: 0.4, roughness: 0.3 }),
     post: new THREE.MeshStandardMaterial({ color: '#6B4A35', roughness: 0.8 }),
     slick: new THREE.MeshStandardMaterial({ color: '#F4FBFF', roughness: 0.04, metalness: 0.25, transparent: true, opacity: 0.85 }),
     deep: new THREE.MeshStandardMaterial({ color: '#2F7FB8', roughness: 0.1, metalness: 0.1 }),
@@ -197,7 +195,7 @@ export function createView(container) {
     });
     lavas = (lv.lava || []).map(L => {   // a dark stone lip, the molten surface inside it, and bubbles that swell and burst
       const cr = Math.min(L.w, L.h) * U * 0.3;
-      const rim = new THREE.Mesh(roundRect(L.w * U + 0.24, L.h * U + 0.24, cr + 0.12), mat.rim); rim.rotation.x = -Math.PI / 2; rim.position.set(X(L.x + L.w / 2), 0.008, Z(L.y + L.h / 2)); rim.receiveShadow = true; board.add(rim);
+      const rim = new THREE.Mesh(roundRect(L.w * U + 0.3, L.h * U + 0.3, cr + 0.15), mat.rim); rim.rotation.x = -Math.PI / 2; rim.position.set(X(L.x + L.w / 2), 0.008, Z(L.y + L.h / 2)); rim.receiveShadow = true; board.add(rim);
       const m = new THREE.Mesh(roundRect(L.w * U, L.h * U, cr), mat.lava); m.rotation.x = -Math.PI / 2; m.position.set(X(L.x + L.w / 2), 0.014, Z(L.y + L.h / 2)); board.add(m);
       const bubbles = Array.from({ length: Math.max(2, Math.round(L.w * L.h / 250)) }, (_, k) => {
         const b = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), mat.bubble); board.add(b); return { b, t: -k * 0.37, L };
