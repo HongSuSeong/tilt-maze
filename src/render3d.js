@@ -45,6 +45,32 @@ const ballTex = () => canvasTex(512, 256, (g, w, h) => {   // coral with cream d
   g.fillStyle = '#FFA396'; g.fillRect(0, h / 2 - 6, w, 12);
 });
 
+// Molten rock: dark crust drifting on a glowing flow, warped noise in the board's own coordinates so pools match up.
+function lavaMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 } },
+    vertexShader: `varying vec2 vP; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vP = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `
+      uniform float uTime; varying vec2 vP;
+      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float noise(vec2 p) { vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
+      float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return v; }
+      void main() {
+        vec2 p = vP * 1.7;
+        vec2 q = vec2(fbm(p + uTime * 0.07), fbm(p + vec2(5.2, 1.3) - uTime * 0.05));
+        float n = fbm(p + 2.2 * q + vec2(uTime * 0.04, -uTime * 0.03));
+        float crust = smoothstep(0.47, 0.56, n);                               // cooled plates riding on the flow
+        float seam = 1.0 - smoothstep(0.0, 0.035, abs(n - 0.5));               // the bright edge where a plate cracks
+        vec3 hot = mix(vec3(1.0, 0.5, 0.08), vec3(0.62, 0.07, 0.01), smoothstep(0.3, 0.5, n));   // linear colours: they brighten on output
+        vec3 col = mix(hot, vec3(0.035, 0.008, 0.004), crust) + vec3(1.0, 0.32, 0.03) * seam * 0.9;
+        col *= 0.9 + 0.1 * sin(uTime * 2.3 + n * 14.0);                        // it breathes
+        gl_FragColor = vec4(col, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
+}
+
 export function createView(container) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
@@ -73,8 +99,13 @@ export function createView(container) {
     vine: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#6FBF5A'; g.fillRect(0, 0, w, h); g.fillStyle = '#4E9A3E'; for (let i = 0; i < 40; i++) { g.beginPath(); g.ellipse((i * 53) % w, (i * 29) % h, 9, 5, i, 0, 7); g.fill(); } }), roughness: 0.8 }),
     ice: new THREE.MeshStandardMaterial({ color: '#CFEFFF', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.78 }),
     door: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#B07A4F'; g.fillRect(0, 0, w, h); g.fillStyle = '#8A5A36'; for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 4, h); }), roughness: 0.7 }),
-    lava: new THREE.MeshStandardMaterial({ color: '#FF8A55', emissive: '#FF5A1E', emissiveIntensity: 0.9, roughness: 0.4 }),
-    stone: new THREE.MeshStandardMaterial({ color: '#8C8580', roughness: 0.95 }),
+    lava: lavaMaterial(),
+    stone: new THREE.MeshStandardMaterial({ map: canvasTex(256, 256, (g, w, h) => {   // lava gone cold: dark basalt, cracked
+      g.fillStyle = '#4A403C'; g.fillRect(0, 0, w, h); g.strokeStyle = '#6E625B'; g.lineWidth = 3;
+      for (let i = 0; i < 22; i++) { let x = (i * 71) % w, y = (i * 113) % h; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 4; k++) { x += ((i * 7 + k * 13) % 41) - 20; y += ((i * 11 + k * 17) % 41) - 20; g.lineTo(x, y); } g.stroke(); }
+    }), roughness: 0.95 }),
+    rim: new THREE.MeshStandardMaterial({ color: '#3A2A24', roughness: 0.9 }),
+    bubble: new THREE.MeshBasicMaterial({ color: '#FFB347' }),
     post: new THREE.MeshStandardMaterial({ color: '#6B4A35', roughness: 0.8 }),
     slick: new THREE.MeshStandardMaterial({ color: '#F4FBFF', roughness: 0.04, metalness: 0.25, transparent: true, opacity: 0.85 }),
     deep: new THREE.MeshStandardMaterial({ color: '#2F7FB8', roughness: 0.1, metalness: 0.1 }),
@@ -164,8 +195,14 @@ export function createView(container) {
       for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.05), mat.eye); e.position.set(sx * 0.11, 0.1, 0.33); e.rotation.z = sx * 0.4; g.add(e); }
       board.add(g); return g;
     });
-    lavas = (lv.lava || []).map(L => {
-      const m = new THREE.Mesh(roundRect(L.w * U, L.h * U, Math.min(L.w, L.h) * U * 0.3), mat.lava); m.rotation.x = -Math.PI / 2; m.position.set(X(L.x + L.w / 2), 0.012, Z(L.y + L.h / 2)); board.add(m); return m;
+    lavas = (lv.lava || []).map(L => {   // a dark stone lip, the molten surface inside it, and bubbles that swell and burst
+      const cr = Math.min(L.w, L.h) * U * 0.3;
+      const rim = new THREE.Mesh(roundRect(L.w * U + 0.24, L.h * U + 0.24, cr + 0.12), mat.rim); rim.rotation.x = -Math.PI / 2; rim.position.set(X(L.x + L.w / 2), 0.008, Z(L.y + L.h / 2)); rim.receiveShadow = true; board.add(rim);
+      const m = new THREE.Mesh(roundRect(L.w * U, L.h * U, cr), mat.lava); m.rotation.x = -Math.PI / 2; m.position.set(X(L.x + L.w / 2), 0.014, Z(L.y + L.h / 2)); board.add(m);
+      const bubbles = Array.from({ length: Math.max(2, Math.round(L.w * L.h / 250)) }, (_, k) => {
+        const b = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), mat.bubble); board.add(b); return { b, t: -k * 0.37, L };
+      });
+      return { m, bubbles };
     });
     torches = (lv.torches || []).map(t => {   // a post with a bowl; a flame once lit
       const g = new THREE.Group(); g.position.set(X(t.x), 0, Z(t.y));
@@ -210,13 +247,20 @@ export function createView(container) {
       if (e.type === 'cool') { const L = level.lava[e.lava]; steam({ x: L.x + L.w / 2, y: L.y + L.h / 2 }); }
       if (e.type === 'freeze') { const D = level.deep[e.deep]; steam({ x: D.x + D.w / 2, y: D.y + D.h / 2 }); }
     }
-    lavas.forEach((m, i) => { m.material = run.state.cooled?.has(i) ? mat.stone : mat.lava; });
+    lavas.forEach((p, i) => {
+      const cold = run.state.cooled?.has(i); p.m.material = cold ? mat.stone : mat.lava;
+      for (const B of p.bubbles) {   // a bubble swells for a while, bursts, and comes up somewhere else
+        B.t += dt; if (B.t > 1.1 || B.t < 0) { if (B.t > 1.1) B.t = -Math.random() * 0.8; B.b.visible = false; continue; }
+        if (B.t - dt <= 0) B.b.position.set(X(B.L.x + 2 + Math.random() * (B.L.w - 4)), 0.03, Z(B.L.y + 2 + Math.random() * (B.L.h - 4)));
+        B.b.visible = !cold; const k = B.t < 0.95 ? B.t / 0.95 : 1 + (B.t - 0.95) * 6; B.b.scale.set(k, k * 0.6, k);
+      }
+    });
+    mat.lava.uniforms.uTime.value = clock;
     deeps.forEach((m, i) => { m.material = run.state.frozen?.has(i) ? mat.slick : mat.deep; });
     switches.forEach((b, i) => { b.material.emissiveIntensity = run.state.powered?.has(i) ? 1.2 : 0; });
     mat.zap.emissiveIntensity = (run.state.clock || 0) % 4 < 2 ? 0.7 + 0.3 * Math.sin(clock * 30) : 0.05;   // on for two seconds, off for two
     foes.forEach((g, i) => { const f = run.state.foes?.[i] || level.enemies[i]; g.position.set(X(f.x), 0.36 + 0.05 * Math.sin(clock * 6 + i), Z(f.y)); g.lookAt(ball.position.x, g.position.y, ball.position.z); });
     torches.forEach((t, i) => { t.flame.visible = !!run.state.lit?.has(i); t.flame.scale.set(1, 1 + 0.15 * Math.sin(clock * 11 + i), 1); });
-    mat.lava.emissiveIntensity = 0.75 + 0.25 * Math.sin(clock * 3.8);
     for (const w of winds) { const sp = Math.hypot(w.a.dx, w.a.dy) / 600 * dt; w.t.offset.x -= sp; }   // the stripes drift with the wind
     fires.forEach((F, i) => {   // flames sway; put out, only the vent is left
       const out = run.state.doused?.has(i); F.flame.visible = F.core.visible = !out;
