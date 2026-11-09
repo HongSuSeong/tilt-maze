@@ -49,4 +49,20 @@ describe('physics', () => {
     expect(h).toBeGreaterThanOrEqual(0); expect(s).toBeGreaterThan(h);
     expect(ev.filter(e => e.type === 'sunk')).toHaveLength(1);
   });
+  it('a trap hole swallows the ball and the stage is lost', () => {
+    const ev = run(createBall(50, 100), { x: 0, y: 10 }, 3, lv({ hole: { x: 50, y: 150, r: 7.4 }, traps: [{ x: 50, y: 120, r: 6 }] }));
+    const t = ev.findIndex(e => e.type === 'trap' && e.trap === 0), l = ev.findIndex(e => e.type === 'lost');
+    expect(t).toBeGreaterThanOrEqual(0); expect(l).toBeGreaterThan(t);
+    expect(ev.some(e => e.type === 'sunk' || e.type === 'hole')).toBe(false);
+  });
+  it('between a trap and the goal, the nearer one takes the ball', () => {
+    const b = createBall(50, 80);
+    const ev = stepBall(b, { x: 0, y: 0 }, 1 / 60, lv({ hole: { x: 56, y: 80, r: 7.4 }, traps: [{ x: 47, y: 80, r: 7.4 }] }), { broken: new Set(), got: new Set() }, 1);
+    expect(ev.map(e => e.type)).toContain('trap'); expect(ev.map(e => e.type)).not.toContain('hole');
+  });
+  it('the rim of a trap pulls the ball in', () => {
+    const b = createBall(50, 80);
+    stepBall(b, { x: 0, y: 0 }, 1 / 60, lv({ traps: [{ x: 58, y: 80, r: 6 }] }), { broken: new Set(), got: new Set() }, 1);
+    expect(b.vx).toBeGreaterThan(0);
+  });
 });
