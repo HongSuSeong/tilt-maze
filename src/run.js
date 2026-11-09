@@ -2,26 +2,40 @@
 import { createBall, stepBall } from './physics.js';
 import { recordClear } from './save.js';
 import { nextLevel } from './levels/index.js';
+import { ELEMENTS, defaultSlots } from './elements.js';
 
 const REST = 30, SKIP_COST = 20, FAILS_TO_REST = 3;
 
 const fresh = run => Object.assign(run, {
-  ball: createBall(run.level.start.x, run.level.start.y), state: { broken: new Set(), got: new Set() }, left: run.level.time, coins: 0, reason: null,
+  ball: createBall(run.level.start.x, run.level.start.y), state: { broken: new Set(), got: new Set(), doused: new Set() }, left: run.level.time, coins: 0, reason: null,
+  coat: null, cool: [0, 0],
 });
 
 // `level` is the stage as the difficulty makes it (see difficulty.js); `diff` says where the result is kept.
-export function createRun(level, diff = 'easy') { return fresh({ level, diff, phase: 'ready', fails: 0, restLeft: 0 }); }
+export function createRun(level, diff = 'easy', slots = defaultSlots(level)) { return fresh({ level, diff, slots: [...slots], phase: 'ready', fails: 0, restLeft: 0 }); }
+export function setSlots(run, slots) { run.slots = [...slots]; }
+
+// Wear the element in slot i: it lasts its time, and the slot can be used again its rest after that.
+export function useSlot(run, i) {
+  const el = run.slots[i];
+  if (run.phase !== 'play' || !el || run.cool[i] > 0) return false;
+  run.coat = { el, left: ELEMENTS[el].dur }; run.cool[i] = ELEMENTS[el].dur + ELEMENTS[el].cool;
+  return true;
+}
 export function startRun(run) { if (run.phase === 'ready') run.phase = 'play'; }
 export function pauseRun(run) { if (run.phase === 'play') run.phase = 'paused'; }
 export function resumeRun(run) { if (run.phase === 'paused') run.phase = 'play'; }
 
 export function tickRun(run, tilt, dt, sens) {
   if (run.phase !== 'play') return [];
-  const ev = stepBall(run.ball, tilt, dt, run.level, run.state, sens);
+  const ev = stepBall(run.ball, tilt, dt, run.level, run.state, sens, run.coat?.el ?? null);
+  if (run.coat && (run.coat.left -= dt) <= 0) run.coat = null;
+  run.cool = run.cool.map(c => Math.max(0, c - dt));
   for (const e of ev) {
     if (e.type === 'coin') run.coins++;
     if (e.type === 'sunk') run.phase = 'clear';
     if (e.type === 'lost') { run.phase = 'fail'; run.reason = 'trap'; }
+    if (e.type === 'burn') { run.phase = 'fail'; run.reason = 'fire'; }
   }
   if (run.phase === 'play' && run.ball.fall === 0 && (run.left -= dt) <= 0) {   // the clock stops once the ball is dropping in
     run.left = 0; run.phase = 'fail'; run.reason = 'timeout'; ev.push({ type: 'timeout' });
