@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createBall, stepBall } from '../src/physics.js';
 
 const lv = (o = {}) => ({ walls: [], coins: [], hole: null, ...o });
-const fresh = () => ({ broken: new Set(), got: new Set() });
+const fresh = () => ({ broken: new Set(), got: new Set(), doused: new Set() });
 function run(ball, tilt, sec, level, state = fresh(), dt = 1 / 60) {
   const ev = [];
   for (let t = 0; t < sec; t += dt) ev.push(...stepBall(ball, tilt, dt, level, state, 1));
@@ -64,5 +64,26 @@ describe('physics', () => {
     const b = createBall(50, 80);
     stepBall(b, { x: 0, y: 0 }, 1 / 60, lv({ traps: [{ x: 58, y: 80, r: 6 }] }), { broken: new Set(), got: new Set() }, 1);
     expect(b.vx).toBeGreaterThan(0);
+  });
+  it('a water puddle slows the ball', () => {
+    const dry = createBall(10, 80), wet = createBall(10, 80), pool = { pools: [{ x: 3, y: 70, w: 94, h: 20 }] };
+    run(dry, { x: 3, y: 0 }, 1, lv()); run(wet, { x: 3, y: 0 }, 1, lv(pool));   // gently, so neither reaches the rim
+    expect(dry.x).toBeLessThan(90); expect(wet.x - 10).toBeLessThan((dry.x - 10) * 0.6);
+  });
+  it('a fire pillar burns a ball without water', () => {
+    const b = createBall(30, 80), ev = run(b, { x: 10, y: 0 }, 2, lv({ fires: [{ x: 60, y: 80, r: 5 }] }));
+    expect(ev.some(e => e.type === 'burn' && e.fire === 0)).toBe(true);
+    expect(b.x).toBeLessThan(60 - 5);
+  });
+  it('water puts a fire pillar out, and the way is open after', () => {
+    const b = createBall(30, 80), s = fresh(), ev = [];
+    for (let t = 0; t < 2; t += 1 / 60) ev.push(...stepBall(b, { x: 10, y: 0 }, 1 / 60, lv({ fires: [{ x: 60, y: 80, r: 5 }] }), s, 1, 'water'));
+    expect(ev.some(e => e.type === 'douse' && e.fire === 0)).toBe(true); expect(ev.some(e => e.type === 'burn')).toBe(false);
+    expect(s.doused.has(0)).toBe(true); expect(b.x).toBeGreaterThan(70);
+  });
+  it('one coat of water puts out two pillars in a row', () => {
+    const s = fresh(), ev = [], b = createBall(20, 80);
+    for (let t = 0; t < 3; t += 1 / 60) ev.push(...stepBall(b, { x: 12, y: 0 }, 1 / 60, lv({ fires: [{ x: 45, y: 80, r: 5 }, { x: 70, y: 80, r: 5 }] }), s, 1, 'water'));
+    expect([...s.doused].sort()).toEqual([0, 1]);
   });
 });

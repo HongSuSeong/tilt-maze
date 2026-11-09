@@ -11,10 +11,13 @@ const FALL_DONE = 1.1;   // seconds from dropping into the hole to the stage bei
 
 export function createBall(x, y) { return { x, y, vx: 0, vy: 0, fall: 0 }; }
 
-// One frame. Returns what happened in it: knock {speed}, break {wall}, coin {coin}, hole, sunk, and for a trap hole
-// trap {trap}, then lost.
-export function stepBall(ball, tilt, dt, level, state, sens) {
+// One frame. Returns what happened in it: knock {speed}, break {wall}, coin {coin}, hole, sunk, for a trap hole
+// trap {trap} then lost, and at a fire pillar douse {fire} (the ball wears water) or burn {fire} (it does not).
+// `coat` is the element the ball wears this frame, or null.
+export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   const ev = [];
+  if (ball.burnt) return ev;
+  state.doused ??= new Set();
   dt = Math.min(dt, 1 / 30);   // after a pause the frame gap can be long; a long step would carry the ball through walls
   if (ball.fall > 0) {   // dropping: drawn toward the middle of the hole until it is gone
     const h = ball.into, k = Math.min(1, dt * 10);
@@ -23,14 +26,21 @@ export function stepBall(ball, tilt, dt, level, state, sens) {
     return ev;
   }
   const rad = Math.PI / 180, ax = FEEL.G * sens * Math.sin(tilt.x * rad), ay = FEEL.G * sens * Math.sin(tilt.y * rad);
-  const h = dt / FEEL.sub;
+  const h = dt / FEEL.sub, fires = level.fires || [];
+  const wet = (level.pools || []).some(p => ball.x > p.x && ball.x < p.x + p.w && ball.y > p.y && ball.y < p.y + p.h);
+  const fric = FEEL.fric * (wet ? 5 : 1);   // a puddle holds the ball back
   for (let i = 0; i < FEEL.sub; i++) {
     ball.vx += ax * h; ball.vy += ay * h;
-    const damp = Math.exp(-FEEL.fric * h); ball.vx *= damp; ball.vy *= damp;
+    const damp = Math.exp(-fric * h); ball.vx *= damp; ball.vy *= damp;
     const sp = Math.hypot(ball.vx, ball.vy); if (sp > FEEL.vmax) { ball.vx *= FEEL.vmax / sp; ball.vy *= FEEL.vmax / sp; }
     ball.x += ball.vx * h; ball.y += ball.vy * h;
     for (const w of RIM_WALLS) collide(ball, w, -1, ev);
     level.walls.forEach((w, i) => { if (!state.broken.has(i)) collide(ball, w, i, ev, state); });
+    for (let f = 0; f < fires.length; f++) {
+      if (state.doused.has(f) || Math.hypot(ball.x - fires[f].x, ball.y - fires[f].y) >= fires[f].r + R) continue;
+      if (coat === 'water') { state.doused.add(f); ev.push({ type: 'douse', fire: f }); }
+      else { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'burn', fire: f }); return ev; }
+    }
   }
   level.coins.forEach((c, i) => {
     if (!state.got.has(i) && Math.hypot(ball.x - c.x, ball.y - c.y) < R + 3) { state.got.add(i); ev.push({ type: 'coin', coin: i }); }
