@@ -59,4 +59,10 @@ describe('validateLevel', () => {
     expect(validateLevel(base({ deep, kit: ['ice'] }))).toEqual([]);
     expect(requires(base({ deep, kit: ['ice'] }), 'ice')).toBe(true);
   });
+  it('a fence opens only with electricity, from a switch that can be reached', () => {
+    const walls = [{ x: 3, y: 80, w: 94, h: 4, kind: 'fence' }];
+    expect(validateLevel(base({ walls, switches: [{ x: 50, y: 40, open: [0] }], kit: ['spark'] }))).toEqual([]);
+    expect(validateLevel(base({ walls, switches: [{ x: 50, y: 40, open: [0] }] }))).toContain('구멍에 갈 수 없음');
+    expect(validateLevel(base({ walls, switches: [{ x: 50, y: 120, open: [0] }], kit: ['spark'] }))).toContain('구멍에 갈 수 없음');
+  });
 });

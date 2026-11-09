@@ -8,7 +8,8 @@ const flat = { x: 0, y: 0 };
 
 describe('elements', () => {
   it('water lasts five seconds and comes back three after', () => expect(ELEMENTS.water).toMatchObject({ name: '물', dur: 5, cool: 3 }));
-  it('each world brings its element', () => { expect(ownedFor(1)).toEqual([]); expect(ownedFor(2)).toEqual(['water']); expect(ownedFor(3)).toEqual(['water', 'fire']); expect(ownedFor(4)).toEqual(['water', 'fire', 'ice']); });
+  it('each world brings its element', () => { expect(ownedFor(1)).toEqual([]); expect(ownedFor(2)).toEqual(['water']); expect(ownedFor(3)).toEqual(['water', 'fire']); expect(ownedFor(4)).toEqual(['water', 'fire', 'ice']); expect(ownedFor(5)).toEqual(['water', 'fire', 'ice', 'spark']); });
+  it('electricity lasts five seconds too', () => expect(ELEMENTS.spark).toMatchObject({ name: '전기', dur: 5, cool: 3 }));
   it('ice lasts five seconds too', () => expect(ELEMENTS.ice).toMatchObject({ name: '얼음', dur: 5, cool: 3 }));
   it('fire lasts five seconds too', () => expect(ELEMENTS.fire).toMatchObject({ name: '불', dur: 5, cool: 3 }));
   it('the slots fill with what is owned', () => { expect(defaultSlots({ world: 1 })).toEqual([null, null]); expect(defaultSlots({ world: 2 })).toEqual(['water', null]); expect(defaultSlots({ world: 3 })).toEqual(['water', 'fire']); expect(defaultSlots({ world: 4 })).toEqual(['fire', 'ice']); });
@@ -44,5 +45,11 @@ describe('elements', () => {
   it('deep water loses the stage', () => {
     const r = createRun(L({ world: 4, fires: [], deep: [{ x: 50, y: 60, w: 20, h: 40 }] })); startRun(r); play(r, { x: 8, y: 0 }, 2);
     expect(r.phase).toBe('fail'); expect(r.reason).toBe('drown');
+  });
+  it('a fence or the electric floor loses the stage, and so does an enemy', () => {
+    const a = createRun(L({ world: 5, fires: [], walls: [{ x: 60, y: 60, w: 4, h: 40, kind: 'fence' }] })); startRun(a); play(a, { x: 8, y: 0 }, 2);
+    expect(a.reason).toBe('shock');
+    const b = createRun(L({ world: 5, fires: [], enemies: [{ x: 30, y: 120, speed: 40 }] })); startRun(b); play(b, flat, 4);
+    expect(b.reason).toBe('caught');
   });
 });

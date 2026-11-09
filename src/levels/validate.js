@@ -23,7 +23,9 @@ export function validateLevel(level) {
   if (!inBoard(hole.x, hole.y)) err.push('구멍: 판 밖');
   coins.forEach((c, i) => { if (!inBoard(c.x, c.y)) err.push(`코인 ${i}: 판 밖`); });
   if (!(level.time >= 20 && level.time <= 120)) err.push(`제한 시간 ${level.time}초 (20–120)`);
-  const kit = level.kit || [], fire = kit.includes('fire'), torches = level.torches || [];
+  const kit = level.kit || [], fire = kit.includes('fire'), spark = kit.includes('spark');
+  // gates: a torch lit with fire opens its door, a switch turned on with electricity its fences (and doors)
+  const gates = [...(fire ? (level.torches || []).map(t => ({ x: t.x, y: t.y, open: [t.door] })) : []), ...(spark ? level.switches || [] : [])];
   const lava = kit.includes('water') ? [] : level.lava || [];   // water cools lava to stone
   const inLava = (x, y) => lava.some(L => x > L.x && x < L.x + L.w && y > L.y && y < L.y + L.h);
   const deep = kit.includes('ice') ? [] : level.deep || [];   // ice freezes deep water into a bridge
@@ -37,7 +39,7 @@ export function validateLevel(level) {
   const W = BW, H = BH;
   let seen;
   function flood(open) {
-    const solid = walls.filter((w, i) => w.kind === 'wall' || ((w.kind === 'vine' || w.kind === 'ice') && !fire) || (w.kind === 'door' && !open.has(i)));
+    const solid = walls.filter((w, i) => w.kind === 'wall' || ((w.kind === 'vine' || w.kind === 'ice') && !fire) || ((w.kind === 'door' || w.kind === 'fence') && !open.has(i)));
     const free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5) && !burns(x + 0.5, y + 0.5) && !inLava(x + 0.5, y + 0.5) && !inDeep(x + 0.5, y + 0.5);
     seen = new Uint8Array(W * H);
     const sx = Math.floor(start.x), sy = Math.floor(start.y), q = [];
@@ -54,9 +56,9 @@ export function validateLevel(level) {
   const open = new Set();
   for (;;) {   // open every door whose torch can be reached, and look again
     flood(open);
-    const more = fire ? torches.filter(t => !open.has(t.door) && reaches(t.x, t.y, R + 2.5)) : [];
+    const more = gates.filter(g => g.open.some(d => !open.has(d)) && reaches(g.x, g.y, R + 2.5));
     if (!more.length) break;
-    for (const t of more) open.add(t.door);
+    for (const g of more) for (const d of g.open) open.add(d);
   }
   function reaches(px, py, r) {
     for (let y = Math.max(0, Math.floor(py - r)); y <= Math.min(H - 1, Math.ceil(py + r)); y++)
