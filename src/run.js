@@ -40,6 +40,8 @@ export function tickRun(run, tilt, dt, sens) {
     if (e.type === 'drown') { run.phase = 'fail'; run.reason = 'drown'; }
     if (e.type === 'shock') { run.phase = 'fail'; run.reason = 'shock'; }
     if (e.type === 'caught') { run.phase = 'fail'; run.reason = 'caught'; }
+    if (e.type === 'fall') { run.phase = 'fail'; run.reason = 'fall'; }
+    if (e.type === 'boom') run.coat = null;
     if (e.type === 'quench') run.coat = null;
   }
   if (run.phase === 'play' && run.ball.fall === 0 && (run.left -= dt) <= 0) {   // the clock stops once the ball is dropping in

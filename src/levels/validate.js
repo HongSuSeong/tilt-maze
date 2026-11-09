@@ -15,8 +15,8 @@ const fits = (x, y, walls) => x >= LO && x <= HIX && y >= LO && y <= HIY && wall
 export function validateLevel(level) {
   const err = [], { walls, coins, start, hole } = level, traps = level.traps || [];
   const inTrap = (x, y) => traps.some(t => Math.hypot(x - t.x, y - t.y) < t.r);
-  // a fire pillar is a wall unless the stage gives water to put it out
-  const fires = (level.kit || []).includes('water') ? [] : level.fires || [];
+  // a fire pillar is a wall unless the stage gives water to put it out (or gas to blow it out)
+  const fires = (level.kit || []).some(k => k === 'water' || k === 'gas') ? [] : level.fires || [];   // gas blows a pillar out too
   const burns = (x, y) => fires.some(f => Math.hypot(x - f.x, y - f.y) < f.r + R);
   walls.forEach((w, i) => { if (!(inBoard(w.x, w.y) && inBoard(w.x + w.w, w.y + w.h))) err.push(`벽 ${i}: 판 밖`); });
   if (!inBoard(start.x, start.y)) err.push('시작점: 판 밖');
@@ -28,6 +28,11 @@ export function validateLevel(level) {
   const gates = [...(fire ? (level.torches || []).map(t => ({ x: t.x, y: t.y, open: [t.door] })) : []), ...(spark ? level.switches || [] : [])];
   const lava = kit.includes('water') ? [] : level.lava || [];   // water cools lava to stone
   const inLava = (x, y) => lava.some(L => x > L.x && x < L.x + L.w && y > L.y && y < L.y + L.h);
+  const gas = kit.includes('gas'), gaps = gas ? [] : level.gaps || [];   // gas floats over a chasm
+  const inGap = (x, y) => gaps.some(g => x > g.x && x < g.x + g.w && y > g.y && y < g.y + g.h);
+  // with gas, any wall near a fire pillar or torch can be blown open
+  const blasts = gas ? [...(level.fires || []), ...(level.torches || [])] : [];
+  const blown = w => blasts.some(b => Math.hypot(b.x - Math.max(w.x, Math.min(b.x, w.x + w.w)), b.y - Math.max(w.y, Math.min(b.y, w.y + w.h))) < 18);
   const deep = kit.includes('ice') ? [] : level.deep || [];   // ice freezes deep water into a bridge
   const inDeep = (x, y) => deep.some(D => x > D.x && x < D.x + D.w && y > D.y && y < D.y + D.h);
   // what stands in the way: walls, and without fire vines, ice and doors; a door opens once its torch can be reached
@@ -39,8 +44,8 @@ export function validateLevel(level) {
   const W = BW, H = BH;
   let seen;
   function flood(open) {
-    const solid = walls.filter((w, i) => w.kind === 'wall' || (w.kind === 'thick' && !kit.includes('stone')) || ((w.kind === 'vine' || w.kind === 'ice') && !fire) || ((w.kind === 'door' || w.kind === 'fence') && !open.has(i)));
-    const free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5) && !burns(x + 0.5, y + 0.5) && !inLava(x + 0.5, y + 0.5) && !inDeep(x + 0.5, y + 0.5);
+    const solid = walls.filter((w, i) => !blown(w) && (w.kind === 'wall' || (w.kind === 'thick' && !kit.includes('stone')) || ((w.kind === 'vine' || w.kind === 'ice') && !fire) || ((w.kind === 'door' || w.kind === 'fence') && !open.has(i))));
+    const free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5) && !burns(x + 0.5, y + 0.5) && !inLava(x + 0.5, y + 0.5) && !inDeep(x + 0.5, y + 0.5) && !inGap(x + 0.5, y + 0.5);
     seen = new Uint8Array(W * H);
     const sx = Math.floor(start.x), sy = Math.floor(start.y), q = [];
     if (free(sx, sy)) { seen[sy * W + sx] = 1; q.push(sx, sy); }

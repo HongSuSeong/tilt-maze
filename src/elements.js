@@ -5,8 +5,9 @@ export const ELEMENTS = {
   ice: { name: '얼음', color: '#8FD8F0', dur: 5, cool: 3 },   // freezes deep water into a bridge
   spark: { name: '전기', color: '#FFD23F', dur: 5, cool: 3 }, // turns switches on; safe on the electric floor
   stone: { name: '돌', color: '#9A8F86', dur: 5, cool: 3 },   // heavy: breaks cracked and thick walls from a short roll; sinks in water
+  gas: { name: '가스', color: '#B8E986', dur: 5, cool: 3 },    // light: floats over chasms, rides the wind; blows up at fire
 };
-export const WORLD_ELEMENT = { 2: 'water', 3: 'fire', 4: 'ice', 5: 'spark', 6: 'stone' };
+export const WORLD_ELEMENT = { 2: 'water', 3: 'fire', 4: 'ice', 5: 'spark', 6: 'stone', 7: 'gas' };
 
 export const ownedFor = world => Object.entries(WORLD_ELEMENT).filter(([w]) => +w <= world).map(([, e]) => e);
 // the last two gained, so the newest is always worn in its own world

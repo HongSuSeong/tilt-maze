@@ -71,4 +71,13 @@ describe('validateLevel', () => {
     const short = { walls: [{ x: 3, y: 30, w: 94, h: 6, kind: 'crack' }, { x: 3, y: 70, w: 94, h: 6, kind: 'crack' }] };
     expect(validateLevel(base(short)).length).toBeGreaterThan(0); expect(validateLevel(base({ ...short, kit: ['stone'] }))).toEqual([]);
   });
+  it('a chasm blocks unless the stage gives gas', () => {
+    const gaps = [{ x: 3, y: 75, w: 94, h: 16 }];
+    expect(validateLevel(base({ gaps }))).toContain('구멍에 갈 수 없음');
+    expect(validateLevel(base({ gaps, kit: ['gas'] }))).toEqual([]);
+  });
+  it('with gas, a wall beside a fire pillar can be blown open', () => {
+    const o = { walls: [{ x: 3, y: 80, w: 94, h: 6, kind: 'thick' }], fires: [{ x: 50, y: 70, r: 5 }], kit: ['gas'] };
+    expect(validateLevel(base(o))).toEqual([]); expect(validateLevel(base({ ...o, kit: [] }))).toContain('구멍에 갈 수 없음');
+  });
 });
