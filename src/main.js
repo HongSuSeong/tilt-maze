@@ -5,7 +5,8 @@ import { createTilt } from './tilt.js';
 import { createUI } from './ui.js';
 import { createSound } from './sound.js';
 import { T } from './text.js';
-import { LEVELS, levelById } from './levels/index.js';
+import { levelById } from './levels/index.js';
+import { levelsFor } from './difficulty.js';
 import { loadSave, writeSave } from './save.js';
 import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear } from './run.js';
 
@@ -32,10 +33,10 @@ async function unlock() {
 async function stayAwake() { try { wake = await navigator.wakeLock?.request('mode'); } catch { wake = null; } }
 
 function load(id) {
-  const level = levelById(id) || LEVELS[0];
-  run = createRun(level); view.load(level); theme();
+  const ls = levelsFor(save.diff), level = ls.find(l => l.id === id) || ls[0];
+  run = createRun(level, save.diff); view.load(level); theme();
 }
-function goHome() { mode = 'home'; if (!run) load(save.reached); ui.show('home', { save, notice }); }
+function goHome() { mode = 'home'; if (!run) load(save.prog[save.diff].reached); ui.show('home', { save, notice }); }
 function ready() { mode = 'ready'; ui.show('ready', { level: run.level }); ui.hud(run); }
 
 const ui = createUI(document.body, {
@@ -46,6 +47,7 @@ const ui = createUI(document.body, {
   retry() { retry(run); view.load(run.level); run.phase === 'rest' ? showRest() : ready(); },
   next() { const n = clearOut?.next; if (n) { load(n.id); ready(); } else goHome(); },
   home() { run = null; wake?.release?.(); goHome(); },
+  pickDiff(d) { save = { ...save, diff: d }; keep(); run = null; goHome(); },
   skipRest() { if (skipRest(run, save)) { keep(); ready(); } },
   openSettings() { ui.show('settings', { opt: save.opt }); },
   closeSettings() { ui.closeSettings(); if (mode === 'home') goHome(); },
@@ -79,7 +81,7 @@ function frame(now) {
       if (run.phase === 'clear') {
         clearOut = afterClear(save, run); save = clearOut.save; keep(); sound.win();
         mode = 'clear'; ui.show('clear', clearOut);
-      } else if (run.phase === 'fail') { sound.fail(); mode = 'fail'; ui.show('fail', { reason: 'timeout' }); }
+      } else if (run.phase === 'fail') { sound.fail(); mode = 'fail'; ui.show('fail', { reason: run.reason }); }
     }
     if (mode === 'rest') {
       tickRest(run, dt);
@@ -90,18 +92,22 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-// #shot=home or #shot=LEVEL[:SCREEN][:dark] — a still for checking the screens without a phone
-const shot = location.hash.match(/^#shot=([\w-]+)(?::(ready|play|pause|clear|fail|rest|settings))?(?::(dark))?$/);
+// #shot=home or #shot=LEVEL, then any of :SCREEN :normal :dark — a still for checking the screens without a phone
+const shot = location.hash.match(/^#shot=([\w-]+)((?::\w+)*)$/);
 if (shot) {
-  if (shot[3]) save.opt.dark = true;
-  if (shot[1] === 'home') { save.coins = 128; save.reached = 'w1-4'; save.best = { t1: { stars: 3 }, t2: { stars: 2 }, t3: { stars: 3 }, 'w1-1': { stars: 1 }, 'w1-2': { stars: 3 }, 'w1-3': { stars: 2 } }; goHome(); }
-  else {
-    load(shot[1]); const s = shot[2] || 'play';
+  const tok = new Set(shot[2].split(':').filter(Boolean)), s = ['ready', 'play', 'pause', 'clear', 'fail', 'rest', 'settings'].find(t => tok.has(t)) || 'play';
+  if (tok.has('dark')) save.opt.dark = true;
+  if (tok.has('normal')) save.diff = 'normal';
+  if (shot[1] === 'home') {
+    save.coins = 128; save.prog.easy = { reached: 'w1-10', best: Object.fromEntries(levelsFor('easy').map((l, i) => [l.id, { stars: 1 + i % 3, time: 20 }])) };
+    goHome();
+  } else {
+    load(shot[1]);
     if (s === 'ready') ready();
     else { startRun(run); mode = 'play'; ui.show('play', { level: run.level }); run.left *= 0.7; run.coins = 2; ui.hud(run); }
     if (s === 'pause') ui.show('pause');
     if (s === 'clear') { clearOut = { stars: 2, reward: 17, next: levelById('w1-4') }; ui.show('clear', clearOut); }
-    if (s === 'fail') ui.show('fail', { reason: 'timeout' });
+    if (s === 'fail') ui.show('fail', { reason: tok.has('normal') ? 'trap' : 'timeout' });
     if (s === 'rest') { run.phase = 'rest'; run.restLeft = 24; ui.show('rest', { left: 24, canSkip: true }); }
     if (s === 'settings') ui.show('settings', { opt: save.opt });
     if (s !== 'play' && s !== 'ready') mode = 'shot';

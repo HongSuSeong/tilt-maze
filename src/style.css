@@ -72,6 +72,14 @@ button.go:active:not(:disabled) { box-shadow: 0 2px 0 var(--go-edge); }
 .grid button small.none { color: var(--star-off); }
 .home .notice { margin: 0; font-size: 14px; color: var(--mute); background: var(--card); border-radius: 16px; padding: 10px 14px; }
 
+/* difficulty chips on the home screen */
+.chips { display: flex; gap: 6px; overflow-x: auto; touch-action: pan-x; padding-bottom: 6px; scrollbar-width: none; }
+.chips button { flex: 1 0 auto; min-height: 44px; padding: 0 8px; font-size: 15px; border-radius: 16px; }
+.chips button[aria-pressed="true"] { background: var(--go); color: var(--go-ink); box-shadow: 0 4px 0 var(--go-edge); }
+.chips button[data-locked] { color: var(--mute); background: var(--soft); box-shadow: 0 4px 0 var(--edge); }
+.row2 { display: flex; gap: 10px; }
+.row2 .go { flex: 1; }
+
 /* settings */
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 26px 26px 0 0; box-shadow: 0 -6px 30px rgba(36, 69, 60, .18); display: grid; gap: 16px;
   padding: 22px max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 18px) max(20px, env(safe-area-inset-left, 0px)); touch-action: pan-y; }

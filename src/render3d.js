@@ -9,8 +9,8 @@ const U = 0.1, WALL_H = 1.0, BAR_TOP = 92, BAR_BOTTOM = 92, VIEW_DEG = 62;
 const X = x => (x - BW / 2) * U, Z = y => (y - BH / 2) * U;
 
 const PALETTE = {
-  light: { bg: '#EAF8F1', floor: '#C7EFDB', dot: '#B1E4CB', wall: '#FFFFFF', base: '#FFFFFF', crack: '#FFD7A3', crackLine: '#E39B57', hole: '#0E2F2A', lip: '#FFFFFF', ring: '#7FD4B4', glow: 0.35, hemi: ['#ffffff', '#9fd9bf', 1.15], sun: 1.9 },
-  dark: { bg: '#0F1A1F', floor: '#15262B', dot: '#203A40', wall: '#2E474F', base: '#263C43', crack: '#B9824C', crackLine: '#6B4A2A', hole: '#000000', lip: '#3B5A62', ring: '#55E0AE', glow: 0.9, hemi: ['#9fc6d8', '#0b1418', 0.75], sun: 0.9 },
+  light: { bg: '#EAF8F1', floor: '#C7EFDB', dot: '#B1E4CB', wall: '#FFFFFF', base: '#FFFFFF', crack: '#FFD7A3', crackLine: '#E39B57', hole: '#0E2F2A', lip: '#FFFFFF', ring: '#7FD4B4', trap: '#FF8A65', glow: 0.35, hemi: ['#ffffff', '#9fd9bf', 1.15], sun: 1.9 },
+  dark: { bg: '#0F1A1F', floor: '#15262B', dot: '#203A40', wall: '#2E474F', base: '#263C43', crack: '#B9824C', crackLine: '#6B4A2A', hole: '#000000', lip: '#3B5A62', ring: '#55E0AE', trap: '#FF7A59', glow: 0.9, hemi: ['#9fc6d8', '#0b1418', 0.75], sun: 0.9 },
 };
 
 function canvasTex(w, h, paint) {
@@ -46,7 +46,7 @@ export function createView(container) {
   const mat = {
     floor: new THREE.MeshStandardMaterial({ roughness: 0.9 }), base: new THREE.MeshStandardMaterial({ roughness: 0.7 }),
     wall: new THREE.MeshStandardMaterial({ roughness: 0.55 }), crack: new THREE.MeshStandardMaterial({ roughness: 0.6, emissive: '#FF9A55', emissiveIntensity: 0 }),
-    hole: new THREE.MeshBasicMaterial(), lip: new THREE.MeshStandardMaterial({ roughness: 0.5 }), ring: new THREE.MeshBasicMaterial(),
+    hole: new THREE.MeshBasicMaterial(), lip: new THREE.MeshStandardMaterial({ roughness: 0.5 }), ring: new THREE.MeshBasicMaterial(), trap: new THREE.MeshBasicMaterial(),
     coin: new THREE.MeshStandardMaterial({ color: '#FFD34E', metalness: 0.05, roughness: 0.35, emissive: '#E0A100' }),
     ball: new THREE.MeshStandardMaterial({ map: ballTex(), roughness: 0.32 }),
     trail: new THREE.MeshBasicMaterial({ color: '#FF9A55', transparent: true, depthWrite: false }),
@@ -63,7 +63,7 @@ export function createView(container) {
     scene.background = new THREE.Color(p.bg);
     mat.floor.map?.dispose(); mat.floor.map = floorTex(p); mat.floor.needsUpdate = true;
     mat.crack.map?.dispose(); mat.crack.map = crackTex(p); mat.crack.emissiveIntensity = dark ? 0.15 : 0; mat.crack.needsUpdate = true;
-    mat.wall.color.set(p.wall); mat.base.color.set(p.base); mat.hole.color.set(p.hole); mat.lip.color.set(p.lip); mat.ring.color.set(p.ring);
+    mat.wall.color.set(p.wall); mat.base.color.set(p.base); mat.hole.color.set(p.hole); mat.lip.color.set(p.lip); mat.ring.color.set(p.ring); mat.trap.color.set(p.trap);
     mat.coin.emissiveIntensity = p.glow;
     hemi.color.set(p.hemi[0]); hemi.groundColor.set(p.hemi[1]); hemi.intensity = p.hemi[2]; sun.intensity = p.sun;
   }
@@ -86,10 +86,13 @@ export function createView(container) {
     for (const w of [{ x: 0, y: 0, w: BW, h: RIM }, { x: 0, y: BH - RIM, w: BW, h: RIM }, { x: 0, y: 0, w: RIM, h: BH }, { x: BW - RIM, y: 0, w: RIM, h: BH }]) block(w, mat.wall);
     walls = lv.walls.map(w => block(w, w.kind === 'crack' ? mat.crack : mat.wall));
     coins = lv.coins.map(c => { const m = new THREE.Mesh(coinGeo, mat.coin); m.rotation.z = Math.PI / 2; m.position.set(X(c.x), 0.45, Z(c.y)); m.castShadow = true; board.add(m); return m; });
-    const h = lv.hole, hole = new THREE.Mesh(new THREE.CircleGeometry(h.r * U, 40), mat.hole);
-    hole.rotation.x = -Math.PI / 2; hole.position.set(X(h.x), 0.008, Z(h.y)); board.add(hole);
-    const lip = new THREE.Mesh(new THREE.TorusGeometry(h.r * U + 0.04, 0.07, 10, 40), mat.lip); lip.rotation.x = Math.PI / 2; lip.position.copy(hole.position); board.add(lip);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(h.r * U + 0.12, h.r * U + 0.3, 40), mat.ring); ring.rotation.x = -Math.PI / 2; ring.position.set(X(h.x), 0.006, Z(h.y)); board.add(ring);
+    // the goal wears a mint ring; trap holes an orange-red one
+    for (const [h, ringMat] of [[lv.hole, mat.ring], ...(lv.traps || []).map(t => [t, mat.trap])]) {
+      const hole = new THREE.Mesh(new THREE.CircleGeometry(h.r * U, 40), mat.hole);
+      hole.rotation.x = -Math.PI / 2; hole.position.set(X(h.x), 0.008, Z(h.y)); board.add(hole);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(h.r * U + 0.04, 0.07, 10, 40), mat.lip); lip.rotation.x = Math.PI / 2; lip.position.copy(hole.position); board.add(lip);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(h.r * U + 0.12, h.r * U + 0.3, 40), ringMat); ring.rotation.x = -Math.PI / 2; ring.position.set(X(h.x), 0.006, Z(h.y)); board.add(ring);
+    }
     board.add(ball); for (const t of trail) { t.m.visible = false; board.add(t.m); }
     ball.quaternion.identity(); ball.visible = true; ball.scale.setScalar(1);
   }
@@ -123,6 +126,7 @@ export function createView(container) {
       if (p.t > 1.4) { board.remove(p.m); bits.splice(i, 1); } else if (p.t > 1) p.m.scale.setScalar((1.4 - p.t) / 0.4);
     }
     if (dark) mat.ring.color.setHSL(0.44, 0.68, 0.6 + 0.06 * Math.sin(clock * 3));   // the hole breathes a little in the dark
+    mat.trap.color.set(dark ? PALETTE.dark.trap : PALETTE.light.trap).offsetHSL(0, 0, 0.06 * Math.sin(clock * 5));   // trap holes flicker
     renderer.render(scene, camera);
   }
 

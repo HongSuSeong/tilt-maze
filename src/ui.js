@@ -1,10 +1,12 @@
 // Everything on screen but the board: the bars while playing, the cards between goes, the home screen, settings.
 // It shows what it is told and hands every tap to the handlers; it keeps no game state of its own.
 import { T } from './text.js';
-import { LEVELS } from './levels/index.js';
+import { DIFFS, levelsFor } from './difficulty.js';
+import { isOpen } from './save.js';
 
 const STAR = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.6l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z" fill="${on ? 'var(--star)' : 'var(--star-off)'}" stroke="${on ? '#E9A91A' : 'none'}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
 const PAUSE = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/></svg>';
+const LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:4px;vertical-align:-1px"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function createUI(root, h) {
@@ -34,22 +36,34 @@ export function createUI(root, h) {
     for (const b of $('card').querySelectorAll('[data-do]')) b.addEventListener('click', () => h[b.dataset.do]());
   }
   const bars = on => { $('hud').hidden = $('dock').hidden = !on; };
-  const label = l => { $('hudWorld').textContent = T.worlds[l.world]; $('hudStage').textContent = T.stage(l); };
+  let diffName = '';
+  const label = l => { $('hudWorld').textContent = T.worlds[l.world] + (diffName ? ` · ${diffName}` : ''); $('hudStage').textContent = T.stage(l); };
 
   function home({ save, notice }) {
-    const at = LEVELS.findIndex(l => l.id === save.reached);
+    const diff = save.diff, ls = levelsFor(diff), p = save.prog[diff], at = Math.max(0, ls.findIndex(l => l.id === p.reached));
+    diffName = DIFFS.find(d => d.id === diff).name;
+    const chip = d => {
+      const open = isOpen(save, d.id);
+      return `<button class="chip" data-diff="${d.id}" aria-pressed="${d.id === diff}" ${open ? '' : 'data-locked="1"'} aria-label="${d.name}${open ? '' : ', ' + T.locked}">${open ? '' : LOCK}${d.name}</button>`;
+    };
     const cell = (l, i) => {
-      const best = save.best[l.id], open = i <= at;
+      const best = p.best[l.id], open = i <= at;
       return `<button data-id="${l.id}" ${open ? '' : 'disabled'} aria-label="${esc(l.name)}${open ? '' : ', ' + T.locked}">${l.index}<small class="${best ? '' : 'none'}">${'★'.repeat(best?.stars || 0)}${'☆'.repeat(3 - (best?.stars || 0))}</small></button>`;
     };
-    const group = w => `<section><h3>${T.worlds[w]}</h3><div class="grid">${LEVELS.map((l, i) => [l, i]).filter(([l]) => l.world === w).map(([l, i]) => cell(l, i)).join('')}</div></section>`;
+    const worlds = [...new Set(ls.map(l => l.world))];
+    const group = w => `<section><h3>${T.worlds[w]}</h3><div class="grid">${ls.map((l, i) => [l, i]).filter(([l]) => l.world === w).map(([l, i]) => cell(l, i)).join('')}</div></section>`;
     $('home').innerHTML = `<div class="inner">
       <header><h1>${T.title}</h1><span class="purse"><span class="coin"></span>${save.coins}</span></header>
       ${notice ? `<p class="notice">${esc(notice)}</p>` : ''}
-      <div class="card" style="box-shadow:none;padding:0;background:none"><div class="row"><button class="go" data-id="${save.reached}">${T.continue} · ${esc(LEVELS[at].name)}</button><button data-do="openSettings" style="flex:0 0 auto">${T.settings}</button></div></div>
-      ${group(0)}${group(1)}
+      <div class="chips" role="group" aria-label="${T.diffPick}">${DIFFS.map(chip).join('')}</div>
+      <div class="row2"><button class="go" data-id="${ls[at].id}">${T.continue} · ${esc(ls[at].name)}</button><button data-do="openSettings">${T.settings}</button></div>
+      ${worlds.map(group).join('')}
     </div>`;
     for (const b of $('home').querySelectorAll('[data-id]')) b.addEventListener('click', () => h.play(b.dataset.id));
+    for (const b of $('home').querySelectorAll('[data-diff]')) b.addEventListener('click', () => {
+      if (b.dataset.locked) return toastFn(['easy', 'normal'].includes(b.dataset.diff) ? T.diffLocked : T.diffSoon);
+      h.pickDiff(b.dataset.diff);
+    });
     $('home').querySelector('[data-do]').addEventListener('click', h.openSettings);
     $('home').hidden = false;
   }
@@ -116,9 +130,10 @@ export function createUI(root, h) {
       $('hudBar').style.width = `${Math.max(0, k) * 100}%`; $('hudTrack').classList.toggle('low', k < 0.25);
       $('hudCoins').textContent = run.coins;
     },
-    toast(text) {
+    toast(text) { toastFn(text); },
+  };
+  function toastFn(text) {
       const el = $('toast'); el.textContent = text; el.hidden = false; el.style.opacity = 1;
       clearTimeout(toastT); toastT = setTimeout(() => { el.style.opacity = 0; setTimeout(() => { el.hidden = true; }, 260); }, 1400);
-    },
-  };
+  }
 }
