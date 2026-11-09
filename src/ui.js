@@ -1,7 +1,7 @@
 // Everything on screen but the board: the bars while playing, the cards between goes, the home screen, settings.
 // It shows what it is told and hands every tap to the handlers; it keeps no game state of its own.
 import { T } from './text.js';
-import { DIFFS, levelsFor } from './difficulty.js';
+import { DIFFS, BUILT, levelsFor } from './difficulty.js';
 import { isOpen, reachedOf } from './save.js';
 import { ELEMENTS, ownedFor } from './elements.js';
 
@@ -70,7 +70,7 @@ export function createUI(root, h) {
     </div>`;
     for (const b of $('home').querySelectorAll('[data-id]')) b.addEventListener('click', () => h.play(b.dataset.id));
     for (const b of $('home').querySelectorAll('[data-diff]')) b.addEventListener('click', () => {
-      if (b.dataset.locked) return toastFn(['easy', 'normal'].includes(b.dataset.diff) ? T.diffLocked : T.diffSoon);
+      if (b.dataset.locked) return toastFn(BUILT.includes(b.dataset.diff) ? T.diffLocked : T.diffSoon);
       h.pickDiff(b.dataset.diff);
     });
     $('home').querySelector('[data-do]').addEventListener('click', h.openSettings);

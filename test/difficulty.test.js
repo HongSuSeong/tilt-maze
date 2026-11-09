@@ -3,8 +3,8 @@ import { applyDifficulty, levelsFor, DIFFS, BUILT } from '../src/difficulty.js';
 import { levelById, nextLevel } from '../src/levels/index.js';
 
 describe('difficulty', () => {
-  it('names five, of which two are built', () => {
-    expect(DIFFS.map(d => d.name)).toEqual(['쉬움', '보통', '어려움', '지옥', '신']); expect(BUILT).toEqual(['easy', 'normal']);
+  it('names five, of which three are built', () => {
+    expect(DIFFS.map(d => d.name)).toEqual(['쉬움', '보통', '어려움', '지옥', '신']); expect(BUILT).toEqual(['easy', 'normal', 'hard']);
   });
   it('easy is the stage as made', () => { const l = levelById('w1-3'); expect(applyDifficulty(l, 'easy')).toEqual(l); });
   it('normal: three quarters of the time, thicker walls, its trap holes', () => {

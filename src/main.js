@@ -109,6 +109,7 @@ if (shot) {
   const tok = new Set(shot[2].split(':').filter(Boolean)), s = ['ready', 'play', 'pause', 'clear', 'fail', 'rest', 'settings'].find(t => tok.has(t)) || 'play';
   if (tok.has('dark')) save.opt.dark = true;
   if (tok.has('normal')) save.diff = 'normal';
+  if (tok.has('hard')) save.diff = 'hard';
   if (shot[1] === 'home') {
     save.coins = 128; save.prog.easy = { reached: 'w1-10', best: Object.fromEntries(levelsFor('easy').map((l, i) => [l.id, { stars: 1 + i % 3, time: 20 }])) };
     goHome();

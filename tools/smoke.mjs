@@ -15,7 +15,7 @@ try {
   await page.goto(`http://localhost:${PORT}/tilt-maze/?test`);
   check(await page.getByRole('button', { name: '쉬움' }).getAttribute('aria-pressed') === 'true', 'easy is chosen at first');
   await page.getByRole('button', { name: /보통/ }).click();
-  check(await page.getByText('앞 난이도의 들판을 모두 깨면 열려요').isVisible(), 'normal is locked on a fresh save, and says why');
+  check(await page.getByText('앞 난이도의 단계를 모두 깨면 열려요').isVisible(), 'normal is locked on a fresh save, and says why');
   await page.getByRole('button', { name: /이어하기/ }).click();
   check(await page.getByRole('button', { name: '시작' }).isVisible(), 'ready card after continue');
   await page.getByRole('button', { name: '시작' }).click();
