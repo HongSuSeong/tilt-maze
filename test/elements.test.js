@@ -8,8 +8,9 @@ const flat = { x: 0, y: 0 };
 
 describe('elements', () => {
   it('water lasts five seconds and comes back three after', () => expect(ELEMENTS.water).toMatchObject({ name: '물', dur: 5, cool: 3 }));
-  it('each world brings its element', () => { expect(ownedFor(1)).toEqual([]); expect(ownedFor(2)).toEqual(['water']); });
-  it('the slots fill with what is owned', () => { expect(defaultSlots({ world: 1 })).toEqual([null, null]); expect(defaultSlots({ world: 2 })).toEqual(['water', null]); });
+  it('each world brings its element', () => { expect(ownedFor(1)).toEqual([]); expect(ownedFor(2)).toEqual(['water']); expect(ownedFor(3)).toEqual(['water', 'fire']); });
+  it('fire lasts five seconds too', () => expect(ELEMENTS.fire).toMatchObject({ name: '불', dur: 5, cool: 3 }));
+  it('the slots fill with what is owned', () => { expect(defaultSlots({ world: 1 })).toEqual([null, null]); expect(defaultSlots({ world: 2 })).toEqual(['water', null]); expect(defaultSlots({ world: 3 })).toEqual(['water', 'fire']); });
   it('a slot coats the ball for five seconds, then rests three', () => {
     const r = createRun(L()); startRun(r);
     expect(useSlot(r, 0)).toBe(true); expect(r.coat).toEqual({ el: 'water', left: 5 });
@@ -29,5 +30,14 @@ describe('elements', () => {
   it('starting over keeps the slots chosen and clears the coat', () => {
     const r = createRun(L()); setSlots(r, [null, 'water']); startRun(r); useSlot(r, 1); retry(r);
     expect(r.slots).toEqual([null, 'water']); expect(r.coat).toBe(null); expect(r.cool).toEqual([0, 0]);
+  });
+  it('fire worn into a puddle goes out, and a vine wall beyond stays', () => {
+    const r = createRun(L({ world: 3, fires: [], pools: [{ x: 40, y: 70, w: 10, h: 20 }], walls: [{ x: 65, y: 60, w: 6, h: 40, kind: 'vine' }] }));
+    startRun(r); useSlot(r, 1); play(r, { x: 8, y: 0 }, 2);
+    expect(r.coat).toBe(null); expect(r.state.broken.has(0)).toBe(false); expect(r.ball.x).toBeLessThan(65);
+  });
+  it('lava loses the stage', () => {
+    const r = createRun(L({ world: 3, fires: [], lava: [{ x: 50, y: 60, w: 20, h: 40 }] })); startRun(r); play(r, { x: 8, y: 0 }, 2);
+    expect(r.phase).toBe('fail'); expect(r.reason).toBe('lava');
   });
 });
