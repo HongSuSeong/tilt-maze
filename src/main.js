@@ -83,7 +83,7 @@ function frame(now) {
       else if (e.type === 'coin') sound.ding();
       else if (e.type === 'hole') sound.plop();
       else if (e.type === 'douse' || e.type === 'cool' || e.type === 'freeze') sound.hiss();
-      else if (e.type === 'burnwall') sound.crash();
+      else if (e.type === 'burnwall' || e.type === 'boom') sound.crash();
       else if (e.type === 'light' || e.type === 'power') sound.coat();
       else if (e.type === 'quench') { sound.hiss(); ui.toast(T.quench); }
     }
@@ -118,7 +118,7 @@ if (shot) {
     else { startRun(run); mode = 'play'; ui.show('play', { level: run.level }); run.left *= 0.7; run.coins = 2; if (tok.has('coat')) { useSlot(run, run.slots[1] ? 1 : 0); run.coat.left = 3.2; } ui.hud(run); }
     if (s === 'pause') ui.show('pause');
     if (s === 'clear') { clearOut = { stars: 2, reward: 17, next: levelById('w1-4') }; ui.show('clear', clearOut); }
-    if (s === 'fail') ui.show('fail', { reason: run.level.enemies?.length ? 'caught' : run.level.deep?.length ? 'drown' : run.level.lava?.length ? 'lava' : run.level.fires ? 'fire' : tok.has('normal') ? 'trap' : 'timeout' });
+    if (s === 'fail') ui.show('fail', { reason: run.level.gaps?.length ? 'fall' : run.level.enemies?.length ? 'caught' : run.level.deep?.length ? 'drown' : run.level.lava?.length ? 'lava' : run.level.fires ? 'fire' : tok.has('normal') ? 'trap' : 'timeout' });
     if (s === 'rest') { run.phase = 'rest'; run.restLeft = 24; ui.show('rest', { left: 24, canSkip: true }); }
     if (s === 'settings') ui.show('settings', { opt: save.opt });
     if (s !== 'play' && s !== 'ready') mode = 'shot';

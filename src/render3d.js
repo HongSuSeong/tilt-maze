@@ -20,8 +20,9 @@ const WORLD_TINT = {
   4: { light: { bg: '#F2F8FC', floor: '#E3F1F8', dot: '#CFE6F2', ring: '#8FD8F0' }, dark: { bg: '#0D161C', floor: '#16242C', dot: '#22343E', ring: '#8FD8F0' } },
   5: { light: { bg: '#F3F6FF', floor: '#FFF8D9', dot: '#F4E9B5', ring: '#5B8CFF' }, dark: { bg: '#10131F', floor: '#1B1F2E', dot: '#2A3048', ring: '#7FA2FF' } },
   6: { light: { bg: '#F4F1EC', floor: '#E6DFD5', dot: '#D6CDC0', ring: '#9A8F86' }, dark: { bg: '#141210', floor: '#221E1A', dot: '#322C26', ring: '#C9BEB3' } },
+  7: { light: { bg: '#EEF8F3', floor: '#DDF2E8', dot: '#C6E7D8', ring: '#9CD66A' }, dark: { bg: '#0E1712', floor: '#16241D', dot: '#22352B', ring: '#B8E986' } },
 };
-const ELEMENT_COLOR = { water: '#5BB8F5', fire: '#FF7A45', ice: '#8FD8F0', spark: '#FFD23F', stone: '#9A8F86' };
+const ELEMENT_COLOR = { water: '#5BB8F5', fire: '#FF7A45', ice: '#8FD8F0', spark: '#FFD23F', stone: '#9A8F86', gas: '#B8E986' };
 
 function canvasTex(w, h, paint) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
@@ -79,6 +80,7 @@ export function createView(container) {
     box: new THREE.MeshStandardMaterial({ color: '#FFD23F', emissive: '#FFB800', emissiveIntensity: 0 }),
     foe: new THREE.MeshStandardMaterial({ color: '#8A6BFF', emissive: '#5A3FD9', emissiveIntensity: 0.35, roughness: 0.4 }),
     eye: new THREE.MeshBasicMaterial({ color: '#FFFFFF' }),
+    gap: new THREE.MeshBasicMaterial({ color: '#1E2A33' }),
     thick: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#A39A90'; g.fillRect(0, 0, w, h); g.strokeStyle = '#7E756C'; g.lineWidth = 4; for (let r = 0; r < 2; r++) for (let x = (r % 2) * 24; x < w; x += 48) g.strokeRect(x, r * h / 2, 48, h / 2); }), roughness: 0.95 }),
   };
   const WALL_MAT = { wall: mat.wall, crack: mat.crack, vine: mat.vine, ice: mat.ice, door: mat.door, fence: mat.fence, thick: mat.thick };
@@ -87,7 +89,7 @@ export function createView(container) {
   const coat = new THREE.Mesh(new THREE.SphereGeometry(R * U * 1.28, 32, 20), mat.coat); coat.visible = false;   // the element the ball wears
   const trail = Array.from({ length: 24 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), mat.trail.clone()); m.visible = false; return { m, t: 9 }; });
   const bitGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16), coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 28);
-  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], switches = [], foes = [], trailI = 0, dark = false, clock = 0;
+  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], switches = [], foes = [], winds = [], trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
 
   function paint() {
@@ -108,7 +110,7 @@ export function createView(container) {
 
   function clear() {
     for (const o of [...board.children]) { board.remove(o); if (o !== ball && !trail.some(t => t.m === o) && o.geometry !== coinGeo && o.geometry !== bitGeo) o.geometry?.dispose(); }
-    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = []; deeps = []; switches = []; foes = [];
+    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = []; deeps = []; switches = []; foes = []; winds = [];
   }
 
   function load(lv) {
@@ -139,6 +141,13 @@ export function createView(container) {
     for (const r of lv.slick || []) flat(r, mat.slick, 0.006);
     deeps = (lv.deep || []).map(r => flat(r, mat.deep, 0.009));
     for (const z of lv.zaps || []) flat(z, mat.zap, 0.007);
+    for (const g of lv.gaps || []) flat(g, mat.gap, 0.011);
+    winds = (lv.winds || []).map(a => {   // stripes that run the way the wind blows
+      const t = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 5; for (let y = 8; y < h; y += 21) { g.beginPath(); g.moveTo(8, y); g.lineTo(40, y); g.lineTo(32, y - 6); g.moveTo(40, y); g.lineTo(32, y + 6); g.stroke(); } });
+      t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(a.w / 22, a.h / 22); t.center.set(0.5, 0.5); t.rotation = -Math.atan2(a.dy, a.dx);
+      const m = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.75, depthWrite: false, color: "#5FA88A" });
+      flat(a, m, 0.013); return { t, a };
+    });
     switches = (lv.switches || []).map(w => {   // a post with a box that lights when powered
       const g = new THREE.Group(); g.position.set(X(w.x), 0, Z(w.y));
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 10), mat.post); post.position.y = 0.35; g.add(post);
@@ -192,6 +201,7 @@ export function createView(container) {
     for (const e of events) {
       if (e.type === 'break' || e.type === 'burnwall') shatter(e.wall, b);
       if (e.type === 'douse') steam(level.fires[e.fire]);
+      if (e.type === 'boom') { const at = e.torch != null ? level.torches[e.torch] : level.fires[e.fire]; steam(at); steam(at); }
       if (e.type === 'cool') { const L = level.lava[e.lava]; steam({ x: L.x + L.w / 2, y: L.y + L.h / 2 }); }
       if (e.type === 'freeze') { const D = level.deep[e.deep]; steam({ x: D.x + D.w / 2, y: D.y + D.h / 2 }); }
     }
@@ -202,6 +212,7 @@ export function createView(container) {
     foes.forEach((g, i) => { const f = run.state.foes?.[i] || level.enemies[i]; g.position.set(X(f.x), 0.36 + 0.05 * Math.sin(clock * 6 + i), Z(f.y)); g.lookAt(ball.position.x, g.position.y, ball.position.z); });
     torches.forEach((t, i) => { t.flame.visible = !!run.state.lit?.has(i); t.flame.scale.set(1, 1 + 0.15 * Math.sin(clock * 11 + i), 1); });
     mat.lava.emissiveIntensity = 0.75 + 0.25 * Math.sin(clock * 3.8);
+    for (const w of winds) { const sp = Math.hypot(w.a.dx, w.a.dy) / 600 * dt; w.t.offset.x -= sp; }   // the stripes drift with the wind
     fires.forEach((F, i) => {   // flames sway; put out, only the vent is left
       const out = run.state.doused?.has(i); F.flame.visible = F.core.visible = !out;
       const k = 1 + 0.12 * Math.sin(clock * 9 + i) + 0.06 * Math.sin(clock * 23 + i * 2); F.flame.scale.set(1, k, 1); F.core.scale.set(1, 2 - k, 1);
