@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateLevel } from '../src/levels/validate.js';
+import { validateLevel, requires } from '../src/levels/validate.js';
 
 const base = (o = {}) => ({ id: 'x', time: 60, start: { x: 12, y: 15 }, hole: { x: 84, y: 143, r: 7.4 }, walls: [], coins: [], ...o });
 
@@ -27,4 +27,12 @@ describe('validateLevel', () => {
     expect(e).toContain('구멍에 갈 수 없음');
   });
   it('the start may not sit in a trap', () => expect(validateLevel(base({ traps: [{ x: 12, y: 15, r: 6 }] }))).toContain('시작점이 함정 안'));
+  it('a fire pillar across the way blocks, unless the stage gives water', () => {
+    const walls = [{ x: 3, y: 80, w: 40, h: 6, kind: 'wall' }, { x: 57, y: 80, w: 40, h: 6, kind: 'wall' }], fires = [{ x: 50, y: 83, r: 5 }];
+    expect(validateLevel(base({ walls, fires }))).toContain('구멍에 갈 수 없음');
+    expect(validateLevel(base({ walls, fires, kit: ['water'] }))).toEqual([]);
+    expect(requires(base({ walls, fires, kit: ['water'] }), 'water')).toBe(true);
+    expect(requires(base({ kit: ['water'] }), 'water')).toBe(false);
+  });
+  it('a puddle can be rolled through', () => expect(validateLevel(base({ pools: [{ x: 3, y: 70, w: 94, h: 30 }] }))).toEqual([]));
 });

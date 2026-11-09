@@ -15,6 +15,9 @@ const fits = (x, y, walls) => x >= LO && x <= HIX && y >= LO && y <= HIY && wall
 export function validateLevel(level) {
   const err = [], { walls, coins, start, hole } = level, traps = level.traps || [];
   const inTrap = (x, y) => traps.some(t => Math.hypot(x - t.x, y - t.y) < t.r);
+  // a fire pillar is a wall unless the stage gives water to put it out
+  const fires = (level.kit || []).includes('water') ? [] : level.fires || [];
+  const burns = (x, y) => fires.some(f => Math.hypot(x - f.x, y - f.y) < f.r + R);
   walls.forEach((w, i) => { if (!(inBoard(w.x, w.y) && inBoard(w.x + w.w, w.y + w.h))) err.push(`벽 ${i}: 판 밖`); });
   if (!inBoard(start.x, start.y)) err.push('시작점: 판 밖');
   if (!inBoard(hole.x, hole.y)) err.push('구멍: 판 밖');
@@ -26,7 +29,7 @@ export function validateLevel(level) {
   coins.forEach((c, i) => { if (walls.some(w => distToRect(c.x, c.y, w) < R)) err.push(`코인 ${i}: 벽 안`); });
 
   // flood the board on a one-unit grid from the start, through cracked walls
-  const W = BW, H = BH, seen = new Uint8Array(W * H), free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5);
+  const W = BW, H = BH, seen = new Uint8Array(W * H), free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5) && !burns(x + 0.5, y + 0.5);
   const sx = Math.floor(start.x), sy = Math.floor(start.y), q = [];
   if (free(sx, sy)) { seen[sy * W + sx] = 1; q.push(sx, sy); }
   for (let k = 0; k < q.length; k += 2) {
@@ -65,4 +68,9 @@ export function validateLevel(level) {
     if (best < RUN_NEEDED) err.push(`금 간 벽 ${i}: 달릴 거리 ${Math.round(best)} (${RUN_NEEDED} 필요)`);
   });
   return err;
+}
+
+// Would the stage be lost without this element? An element that is only decoration is a design fault.
+export function requires(level, el) {
+  return validateLevel({ ...level, kit: (level.kit || []).filter(k => k !== el) }).includes('구멍에 갈 수 없음');
 }
