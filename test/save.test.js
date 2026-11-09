@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { defaultSave, loadSave, writeSave, recordClear, isOpen, markOpened, reachedOf } from '../src/save.js';
 import { nextLevel } from '../src/levels/index.js';
+import { levelsFor } from '../src/difficulty.js';
 
 const mem = () => { const m = {}; return { getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, m }; };
 const KEY = 'tilt-maze:v1';
-const fields = n => Object.fromEntries(Array.from({ length: n }, (_, i) => [`w1-${i + 1}`, { stars: 1, time: 30 }]));
+const fields = n => Object.fromEntries(Array.from({ length: n }, (_, i) => [`w1-${i + 1}`, { stars: 1, time: 30 }]));   // the first n of the fields
+const FIELD_IDS = levelsFor('easy').filter(l => l.world > 0).map(l => l.id);
+const allFields = (less = 0) => Object.fromEntries(FIELD_IDS.slice(0, FIELD_IDS.length - less).map(id => [id, { stars: 1, time: 30 }]));
 
 describe('save', () => {
   it('round-trips', () => {
@@ -41,11 +44,11 @@ describe('save', () => {
     const s = defaultSave(); s.prog.easy.reached = 'w1-5';
     expect(recordClear(s, 'easy', 'w1-2', 1, 50, 0).prog.easy.reached).toBe('w1-5');   // replaying an old stage keeps the furthest
   });
-  it('normal opens once every field stage on easy is cleared', () => {
+  it('normal opens once every stage on easy, practice aside, is cleared', () => {
     const s = defaultSave();
     expect(isOpen(s, 'easy')).toBe(true);
-    s.prog.easy.best = fields(9); expect(isOpen(s, 'normal')).toBe(false);
-    s.prog.easy.best = fields(10); expect(isOpen(s, 'normal')).toBe(true);
+    s.prog.easy.best = allFields(1); expect(isOpen(s, 'normal')).toBe(false);
+    s.prog.easy.best = allFields(); expect(isOpen(s, 'normal')).toBe(true);
     expect(isOpen(s, 'hard')).toBe(false);
   });
   it('the furthest stage moves past every stage already cleared', () => {
@@ -62,6 +65,6 @@ describe('save', () => {
   });
   it('marks what has come open', () => {
     const s = defaultSave(); expect(s.opened).toEqual(['easy']);
-    s.prog.easy.best = fields(10); expect(markOpened(s).opened).toEqual(['easy', 'normal']);
+    s.prog.easy.best = allFields(); expect(markOpened(s).opened).toEqual(['easy', 'normal']);
   });
 });

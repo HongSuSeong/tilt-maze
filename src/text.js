@@ -1,7 +1,7 @@
 // Every word on screen, in one place so it can be translated later.
 export const T = {
   title: '틸트 미로',
-  worlds: { 0: '연습', 1: '들판' },
+  worlds: { 0: '연습', 1: '들판', 2: '물가' },
   stage: l => (l.world === 0 ? `연습 ${l.index}` : `${l.index}단계`),
   continue: '이어하기', settings: '설정', coins: '코인',
   locked: '잠김',
