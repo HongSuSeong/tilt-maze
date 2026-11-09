@@ -23,29 +23,45 @@ export function validateLevel(level) {
   if (!inBoard(hole.x, hole.y)) err.push('구멍: 판 밖');
   coins.forEach((c, i) => { if (!inBoard(c.x, c.y)) err.push(`코인 ${i}: 판 밖`); });
   if (!(level.time >= 20 && level.time <= 120)) err.push(`제한 시간 ${level.time}초 (20–120)`);
-  const solid = walls.filter(w => w.kind !== 'crack');
+  const kit = level.kit || [], fire = kit.includes('fire'), torches = level.torches || [];
+  const lava = kit.includes('water') ? [] : level.lava || [];   // water cools lava to stone
+  const inLava = (x, y) => lava.some(L => x > L.x && x < L.x + L.w && y > L.y && y < L.y + L.h);
+  // what stands in the way: walls, and without fire vines, ice and doors; a door opens once its torch can be reached
   if (!fits(start.x, start.y, walls)) err.push('시작점이 벽에 붙어 있음');
   if (inTrap(start.x, start.y)) err.push('시작점이 함정 안');
   coins.forEach((c, i) => { if (walls.some(w => distToRect(c.x, c.y, w) < R)) err.push(`코인 ${i}: 벽 안`); });
 
   // flood the board on a one-unit grid from the start, through cracked walls
-  const W = BW, H = BH, seen = new Uint8Array(W * H), free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5) && !burns(x + 0.5, y + 0.5);
-  const sx = Math.floor(start.x), sy = Math.floor(start.y), q = [];
-  if (free(sx, sy)) { seen[sy * W + sx] = 1; q.push(sx, sy); }
-  for (let k = 0; k < q.length; k += 2) {
-    const x = q[k], y = q[k + 1];
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nx = x + dx, ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= W || ny >= H || seen[ny * W + nx] || !free(nx, ny)) continue;
-      seen[ny * W + nx] = 1; q.push(nx, ny);
+  const W = BW, H = BH;
+  let seen;
+  function flood(open) {
+    const solid = walls.filter((w, i) => w.kind === 'wall' || ((w.kind === 'vine' || w.kind === 'ice') && !fire) || (w.kind === 'door' && !open.has(i)));
+    const free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5) && !burns(x + 0.5, y + 0.5) && !inLava(x + 0.5, y + 0.5);
+    seen = new Uint8Array(W * H);
+    const sx = Math.floor(start.x), sy = Math.floor(start.y), q = [];
+    if (free(sx, sy)) { seen[sy * W + sx] = 1; q.push(sx, sy); }
+    for (let k = 0; k < q.length; k += 2) {
+      const x = q[k], y = q[k + 1];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || seen[ny * W + nx] || !free(nx, ny)) continue;
+        seen[ny * W + nx] = 1; q.push(nx, ny);
+      }
     }
   }
-  const reaches = (px, py, r) => {
+  const open = new Set();
+  for (;;) {   // open every door whose torch can be reached, and look again
+    flood(open);
+    const more = fire ? torches.filter(t => !open.has(t.door) && reaches(t.x, t.y, R + 2.5)) : [];
+    if (!more.length) break;
+    for (const t of more) open.add(t.door);
+  }
+  function reaches(px, py, r) {
     for (let y = Math.max(0, Math.floor(py - r)); y <= Math.min(H - 1, Math.ceil(py + r)); y++)
       for (let x = Math.max(0, Math.floor(px - r)); x <= Math.min(W - 1, Math.ceil(px + r)); x++)
         if (seen[y * W + x] && Math.hypot(x + 0.5 - px, y + 0.5 - py) < r) return true;
     return false;
-  };
+  }
   if (!reaches(hole.x, hole.y, hole.r - R * 0.35)) err.push('구멍에 갈 수 없음');
   coins.forEach((c, i) => { if (!reaches(c.x, c.y, R + 3)) err.push(`코인 ${i}에 갈 수 없음`); });
 

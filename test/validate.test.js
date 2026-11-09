@@ -35,4 +35,22 @@ describe('validateLevel', () => {
     expect(requires(base({ kit: ['water'] }), 'water')).toBe(false);
   });
   it('a puddle can be rolled through', () => expect(validateLevel(base({ pools: [{ x: 3, y: 70, w: 94, h: 30 }] }))).toEqual([]));
+  const across = kind => [{ x: 3, y: 80, w: 94, h: 6, kind }];
+  it('vines and ice walls block unless the stage gives fire', () => {
+    for (const kind of ['vine', 'ice']) {
+      expect(validateLevel(base({ walls: across(kind) }))).toContain('구멍에 갈 수 없음');
+      expect(validateLevel(base({ walls: across(kind), kit: ['fire'] }))).toEqual([]);
+      expect(requires(base({ walls: across(kind), kit: ['fire'] }), 'fire')).toBe(true);
+    }
+  });
+  it('a door opens only with fire, and its torch must be reachable', () => {
+    expect(validateLevel(base({ walls: across('door'), torches: [{ x: 50, y: 40, door: 0 }], kit: ['fire'] }))).toEqual([]);
+    expect(validateLevel(base({ walls: across('door'), torches: [{ x: 50, y: 40, door: 0 }] }))).toContain('구멍에 갈 수 없음');
+    expect(validateLevel(base({ walls: across('door'), torches: [{ x: 50, y: 120, door: 0 }], kit: ['fire'] }))).toContain('구멍에 갈 수 없음');   // the torch is behind its own door
+  });
+  it('lava blocks unless the stage gives water', () => {
+    const lava = [{ x: 3, y: 75, w: 94, h: 16 }];
+    expect(validateLevel(base({ lava }))).toContain('구멍에 갈 수 없음');
+    expect(validateLevel(base({ lava, kit: ['water'] }))).toEqual([]);
+  });
 });
