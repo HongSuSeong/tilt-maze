@@ -8,7 +8,7 @@ import { T } from './text.js';
 import { levelById } from './levels/index.js';
 import { levelsFor } from './difficulty.js';
 import { loadSave, writeSave, markOpened, reachedOf } from './save.js';
-import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear, useSlot, setSlots } from './run.js';
+import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear, useSlot, setSlots, SKIP_COST } from './run.js';
 import { ownedFor } from './elements.js';
 
 let save = loadSave();
@@ -62,7 +62,7 @@ const ui = createUI(document.body, {
   },
 });
 
-function showRest() { mode = 'rest'; ui.show('rest', { left: run.restLeft, canSkip: save.coins >= 20 }); }
+function showRest() { mode = 'rest'; ui.show('rest', { left: run.restLeft, canSkip: save.coins >= SKIP_COST }); }
 let clearOut = null;
 
 addEventListener('visibilitychange', () => {   // away from the game: stop the clock where it is
@@ -93,7 +93,7 @@ function frame(now) {
     }
     if (mode === 'rest') {
       tickRest(run, dt);
-      if (run.phase === 'ready') ready(); else ui.rest(run.restLeft, save.coins >= 20);
+      if (run.phase === 'ready') ready(); else ui.rest(run.restLeft, save.coins >= SKIP_COST);
     }
     view.update(run, mode === 'home' ? { x: 0, y: 0 } : t, dt, ev);
   }

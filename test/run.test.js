@@ -18,8 +18,12 @@ describe('run', () => {
     const r = createRun(L);
     r.left = 20; expect(starsFor(r)).toBe(3); r.left = 10; expect(starsFor(r)).toBe(2); r.left = 9.9; expect(starsFor(r)).toBe(1);
   });
-  it('rewards the coins picked up, five for clearing and five a star', () => {
-    const r = createRun(L); r.coins = 2; r.left = 40; expect(rewardFor(r)).toBe(22);
+  it('rewards the coins picked up, and a coin a star the first time', () => {
+    const r = createRun(L); r.coins = 2; r.left = 40; expect(rewardFor(r)).toBe(5);
+  });
+  it('again: only the stars it betters', () => {
+    const r = createRun(L); r.coins = 2; r.left = 40;
+    expect(rewardFor(r, { stars: 1 })).toBe(4); expect(rewardFor(r, { stars: 3 })).toBe(2);
   });
   it('three fails in a row bring a rest of thirty seconds', () => {
     const r = createRun(L); startRun(r);
@@ -27,10 +31,10 @@ describe('run', () => {
     retry(r); expect(r.phase).toBe('rest'); expect(r.restLeft).toBe(30);
     tickRest(r, 29); expect(r.phase).toBe('rest'); tickRest(r, 1.5); expect(r.phase).toBe('ready'); expect(r.fails).toBe(0);
   });
-  it('twenty coins skip the rest, nineteen do not', () => {
+  it('ten coins skip the rest, nine do not', () => {
     const r = createRun(L); for (let i = 0; i < 3; i++) retry(r);
-    const poor = { coins: 19 }; expect(skipRest(r, poor)).toBe(false); expect(r.phase).toBe('rest');
-    const rich = { coins: 25 }; expect(skipRest(r, rich)).toBe(true); expect(rich.coins).toBe(5); expect(r.phase).toBe('ready');
+    const poor = { coins: 9 }; expect(skipRest(r, poor)).toBe(false); expect(r.phase).toBe('rest');
+    const rich = { coins: 25 }; expect(skipRest(r, rich)).toBe(true); expect(rich.coins).toBe(15); expect(r.phase).toBe('ready');
   });
   it('time stands still while paused', () => {
     const r = createRun(L); startRun(r); pauseRun(r); play(r, { x: 10, y: 0 }, 5);

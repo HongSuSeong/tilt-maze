@@ -4,7 +4,7 @@ import { recordClear } from './save.js';
 import { nextLevel } from './levels/index.js';
 import { ELEMENTS, defaultSlots } from './elements.js';
 
-const REST = 30, SKIP_COST = 20, FAILS_TO_REST = 3;
+export const REST = 30, SKIP_COST = 10, FAILS_TO_REST = 3;
 
 const fresh = run => Object.assign(run, {
   ball: createBall(run.level.start.x, run.level.start.y), state: { broken: new Set(), got: new Set(), doused: new Set() }, left: run.level.time, coins: 0, reason: null,
@@ -58,11 +58,12 @@ export function skipRest(run, save) {
 }
 
 export function starsFor(run) { const k = run.left / run.level.time; return k >= 0.5 ? 3 : k >= 0.25 ? 2 : 1; }
-export function rewardFor(run) { return run.coins + 5 + 5 * starsFor(run); }
+// the coins picked up, and a coin for each star better than the stage's best so far (all of them the first time)
+export function rewardFor(run, best = null) { return run.coins + Math.max(0, starsFor(run) - (best?.stars ?? 0)); }
 
 
 // A stage cleared: what the save keeps, and the stage that comes next (null after the last).
 export function afterClear(save, run) {
-  const stars = starsFor(run), reward = rewardFor(run);
+  const stars = starsFor(run), reward = rewardFor(run, save.prog[run.diff].best[run.level.id]);
   return { save: recordClear(save, run.diff, run.level.id, stars, run.level.time - run.left, reward), stars, reward, next: nextLevel(run.level.id, run.diff) };
 }
