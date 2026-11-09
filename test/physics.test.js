@@ -174,4 +174,25 @@ describe('physics', () => {
     const b = createBall(30, 80), ev = roll(b, { x: 8, y: 0 }, 2, lv({ pools: [{ x: 50, y: 60, w: 20, h: 40 }] }), fresh(), 'stone');
     expect(ev.some(e => e.type === 'drown')).toBe(true);
   });
+  const wind = { winds: [{ x: 3, y: 60, w: 94, h: 40, dx: 300, dy: 0 }] };
+  it('wind pushes the ball; gas three times as hard; stone not at all', () => {
+    const plain = createBall(20, 80), light = createBall(20, 80), heavy = createBall(20, 80);
+    roll(plain, { x: 0, y: 0 }, 0.4, lv(wind), fresh(), null); roll(light, { x: 0, y: 0 }, 0.4, lv(wind), fresh(), 'gas'); roll(heavy, { x: 0, y: 0 }, 0.4, lv(wind), fresh(), 'stone');
+    expect(plain.x).toBeGreaterThan(25); expect(light.x - 20).toBeGreaterThan((plain.x - 20) * 2.5); expect(heavy.x).toBe(20);
+  });
+  it('a chasm swallows a ball; one wearing gas floats over', () => {
+    const gap = { gaps: [{ x: 50, y: 60, w: 20, h: 40 }] };
+    const a = createBall(30, 80); expect(roll(a, { x: 8, y: 0 }, 2, lv(gap), fresh(), null).some(e => e.type === 'fall')).toBe(true);
+    const b = createBall(30, 80); expect(roll(b, { x: 8, y: 0 }, 2, lv(gap), fresh(), 'gas').some(e => e.type === 'fall')).toBe(false); expect(b.x).toBeGreaterThan(70);
+  });
+  it('gas meets fire: a blast breaks the walls near and throws the ball back', () => {
+    const level = lv({ fires: [{ x: 60, y: 80, r: 5 }], walls: [{ x: 70, y: 60, w: 6, h: 40, kind: 'thick' }, { x: 3, y: 20, w: 20, h: 6, kind: 'wall' }] });
+    const s = fresh(), b = createBall(40, 80), ev = roll(b, { x: 8, y: 0 }, 1, level, s, 'gas');
+    expect(ev.some(e => e.type === 'boom')).toBe(true); expect(ev.some(e => e.type === 'burn')).toBe(false);
+    expect(s.broken.has(0)).toBe(true); expect(s.broken.has(1)).toBe(false); expect(s.doused.has(0)).toBe(true);
+  });
+  it('gas meets a torch: the same blast', () => {
+    const s = fresh(), ev = roll(createBall(30, 80), { x: 8, y: 0 }, 1, lv({ torches: [{ x: 50, y: 80, door: 0 }], walls: [{ x: 58, y: 60, w: 6, h: 40, kind: 'wall' }] }), s, 'gas');
+    expect(ev.some(e => e.type === 'boom')).toBe(true); expect(s.broken.has(0)).toBe(true);
+  });
 });

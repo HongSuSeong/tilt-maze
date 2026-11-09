@@ -8,7 +8,8 @@ const RIM_WALLS = [
   { x: 0, y: 0, w: RIM, h: BH }, { x: BW - RIM, y: 0, w: RIM, h: BH },
 ];
 const FALL_DONE = 1.1;
-const STONE_BRK = 60;   // a ball of stone is heavy: a short roll breaks cracked and thick walls   // seconds from dropping into the hole to the stage being over
+const STONE_BRK = 60;
+const BOOM_R = 18, BOOM_V = 400;   // a blast breaks every wall this near the fire, and throws the ball this fast   // a ball of stone is heavy: a short roll breaks cracked and thick walls   // seconds from dropping into the hole to the stage being over
 
 export function createBall(x, y) { return { x, y, vx: 0, vy: 0, fall: 0 }; }
 
@@ -18,7 +19,8 @@ export function createBall(x, y) { return { x, y, vx: 0, vy: 0, fall: 0 }; }
 // turns lava to stone) or lava {lava} (the ball sinks in), quench (fire worn into a puddle goes out), and in deep
 // water freeze {deep} (ice turns it to a slippery bridge) or drown {deep}, shock (an electric fence, or the electric
 // floor while it is on), power {sw} (electricity worn turns a switch on: its fences go off, its doors open), and caught
-// (an enemy reached the ball).
+// (an enemy reached the ball), fall (into a chasm; gas floats over it) and boom {fire} (gas worn meets fire: the walls
+// near it break and the ball is thrown back).
 // `coat` is the element the ball wears this frame, or null.
 export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   const ev = [];
@@ -43,12 +45,17 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   if (wet && coat === 'stone') { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'drown' }); return ev; }   // a ball of stone sinks
   for (let i = 0; i < FEEL.sub; i++) {
     ball.vx += ax * h; ball.vy += ay * h;
+    for (const wd of level.winds || []) if (inside(wd)) { const k = coat === 'gas' ? 3 : coat === 'stone' ? 0 : 1; ball.vx += wd.dx * k * h; ball.vy += wd.dy * k * h; }   // gas is light, stone heavy
     const damp = Math.exp(-fric * h); ball.vx *= damp; ball.vy *= damp;
     const sp = Math.hypot(ball.vx, ball.vy); if (sp > FEEL.vmax) { ball.vx *= FEEL.vmax / sp; ball.vy *= FEEL.vmax / sp; }
     ball.x += ball.vx * h; ball.y += ball.vy * h;
     for (const w of RIM_WALLS) collide(ball, w, -1, ev);
     level.walls.forEach((w, i) => { if (!state.broken.has(i)) collide(ball, w, i, ev, state, coat); });
     if (ball.burnt) return ev;   // an electric fence
+    for (const g of level.gaps || []) {
+      const m = R * 0.4;
+      if (coat !== 'gas' && ball.x > g.x + m && ball.x < g.x + g.w - m && ball.y > g.y + m && ball.y < g.y + g.h - m) { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'fall' }); return ev; }
+    }
     (level.switches || []).forEach((w, i) => {
       if (coat !== 'spark' || state.powered.has(i) || Math.hypot(ball.x - w.x, ball.y - w.y) >= R + 2.5) return;
       state.powered.add(i); for (const d of w.open) state.broken.add(d); ev.push({ type: 'power', sw: i });
@@ -56,7 +63,9 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
     const on = state.clock % 4 < 2;   // the electric floor: two seconds on, two off
     for (const z of level.zaps || []) if (inside(z) && coat !== 'spark' && (on || coat === 'water')) return shock();
     (level.torches || []).forEach((t, i) => {
-      if (coat !== 'fire' || state.lit.has(i) || Math.hypot(ball.x - t.x, ball.y - t.y) >= R + 2.5) return;
+      if (Math.hypot(ball.x - t.x, ball.y - t.y) >= R + 2.5) return;
+      if (coat === 'gas') { boom(ball, level, state, t, ev); ev.push({ type: 'boom', torch: i }); coat = null; return; }
+      if (coat !== 'fire' || state.lit.has(i)) return;
       state.lit.add(i); state.broken.add(t.door); ev.push({ type: 'light', torch: i });
     });
     for (let k = 0; k < deep.length; k++) {
@@ -77,6 +86,7 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
     for (let f = 0; f < fires.length; f++) {
       if (state.doused.has(f) || Math.hypot(ball.x - fires[f].x, ball.y - fires[f].y) >= fires[f].r + R) continue;
       if (coat === 'water') { state.doused.add(f); ev.push({ type: 'douse', fire: f }); }
+      else if (coat === 'gas') { boom(ball, level, state, fires[f], ev); state.doused.add(f); ev.push({ type: 'boom', fire: f }); coat = null; }
       else { ball.burnt = true; ball.vx = ball.vy = 0; ev.push({ type: 'burn', fire: f }); return ev; }
     }
   }
@@ -158,4 +168,12 @@ function chase(ball, level, state, dt, coat) {
     if (!away && Math.hypot(ball.x - f.x, ball.y - f.y) < R + FOE_R) caught = true;
   }
   return caught;
+}
+
+function boom(ball, level, state, at, ev) {
+  level.walls.forEach((w, i) => {
+    if (!state.broken.has(i) && Math.hypot(at.x - Math.max(w.x, Math.min(at.x, w.x + w.w)), at.y - Math.max(w.y, Math.min(at.y, w.y + w.h))) < BOOM_R) { state.broken.add(i); ev.push({ type: 'break', wall: i }); }
+  });
+  const dx = ball.x - at.x, dy = ball.y - at.y, d = Math.hypot(dx, dy) || 1;
+  ball.vx = dx / d * BOOM_V; ball.vy = dy / d * BOOM_V;
 }
