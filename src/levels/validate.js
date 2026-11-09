@@ -39,7 +39,7 @@ export function validateLevel(level) {
   const W = BW, H = BH;
   let seen;
   function flood(open) {
-    const solid = walls.filter((w, i) => w.kind === 'wall' || ((w.kind === 'vine' || w.kind === 'ice') && !fire) || ((w.kind === 'door' || w.kind === 'fence') && !open.has(i)));
+    const solid = walls.filter((w, i) => w.kind === 'wall' || (w.kind === 'thick' && !kit.includes('stone')) || ((w.kind === 'vine' || w.kind === 'ice') && !fire) || ((w.kind === 'door' || w.kind === 'fence') && !open.has(i)));
     const free = (x, y) => fits(x + 0.5, y + 0.5, solid) && !inTrap(x + 0.5, y + 0.5) && !burns(x + 0.5, y + 0.5) && !inLava(x + 0.5, y + 0.5) && !inDeep(x + 0.5, y + 0.5);
     seen = new Uint8Array(W * H);
     const sx = Math.floor(start.x), sy = Math.floor(start.y), q = [];
@@ -71,7 +71,7 @@ export function validateLevel(level) {
 
   // a cracked wall needs a straight run toward it, across its long side, somewhere along it
   walls.forEach((w, i) => {
-    if (w.kind !== 'crack') return;
+    if (w.kind !== 'crack' || kit.includes('stone')) return;   // stone breaks it from a short roll
     const others = walls.filter(o => o !== w), across = w.w >= w.h;   // a wide wall is hit from above or below
     let best = 0;
     for (let s = 0; s <= (across ? w.w : w.h); s += 2) {

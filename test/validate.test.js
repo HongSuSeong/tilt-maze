@@ -65,4 +65,10 @@ describe('validateLevel', () => {
     expect(validateLevel(base({ walls, switches: [{ x: 50, y: 40, open: [0] }] }))).toContain('구멍에 갈 수 없음');
     expect(validateLevel(base({ walls, switches: [{ x: 50, y: 120, open: [0] }], kit: ['spark'] }))).toContain('구멍에 갈 수 없음');
   });
+  it('a thick wall blocks unless the stage gives stone, and stone needs no run-up', () => {
+    expect(validateLevel(base({ walls: [{ x: 3, y: 80, w: 94, h: 6, kind: 'thick' }] }))).toContain('구멍에 갈 수 없음');
+    expect(validateLevel(base({ walls: [{ x: 3, y: 80, w: 94, h: 6, kind: 'thick' }], kit: ['stone'] }))).toEqual([]);
+    const short = { walls: [{ x: 3, y: 30, w: 94, h: 6, kind: 'crack' }, { x: 3, y: 70, w: 94, h: 6, kind: 'crack' }] };
+    expect(validateLevel(base(short)).length).toBeGreaterThan(0); expect(validateLevel(base({ ...short, kit: ['stone'] }))).toEqual([]);
+  });
 });
