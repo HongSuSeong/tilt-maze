@@ -21,7 +21,7 @@ const angle = () => (window.screen.orientation?.angle ?? window.orientation ?? 0
 const theme = () => { document.documentElement.dataset.theme = save.opt.dark ? 'dark' : 'light'; view.setDark(save.opt.dark); };
 
 addEventListener('deviceorientation', e => { if (e.beta != null) tilt.feed(e); });
-addEventListener('keydown', e => { keys[e.key] = true; if ((e.key === '1' || e.key === '2') && run && useSlot(run, +e.key - 1)) sound.coat(); });   // number keys stand in for the slots on a computer
+addEventListener('keydown', e => { keys[e.key] = true; if ((e.key === '1' || e.key === '2') && run && useSlot(run, +e.key - 1)) { sound.coat(); view.burst(run.coat.el); } });   // number keys stand in for the slots on a computer
 addEventListener('keyup', e => { keys[e.key] = false; });
 addEventListener('resize', () => view.resize());
 
@@ -78,7 +78,7 @@ const ui = createUI(document.body, {
     if (save.coins < price) return ui.toast(T.needCoins(price - save.coins));
     ui.ask(T.askBuy('boost', '', price), null, () => { save = buyBoost(save).save; keep(); sound.win(); ui.show('shop', { save }); });
   },
-  useSlot(i) { if (run && useSlot(run, i)) sound.coat(); },
+  useSlot(i) { if (run && useSlot(run, i)) { sound.coat(); view.burst(run.coat.el); } },
   cycleSlot(i) {   // empty → each owned element → empty
     const opts = [null, ...ownedFor(run.level.world)], next = opts[(opts.indexOf(run.slots[i]) + 1) % opts.length], sl = [...run.slots];
     sl[i] = next; if (next && sl[1 - i] === next) sl[1 - i] = null;   // one element is worn from one slot
@@ -141,7 +141,8 @@ if (shot) {
   } else {
     load(shot[1]);
     if (s === 'ready') ready();
-    else { startRun(run); mode = 'play'; ui.show('play', { level: run.level }); run.left *= 0.7; run.coins = 2; if (tok.has('coat')) { useSlot(run, run.slots[1] ? 1 : 0); run.coat.left = 3.2; } ui.hud(run); }
+    else { startRun(run); mode = 'play'; ui.show('play', { level: run.level }); run.left *= 0.7; run.coins = 2; if (tok.has('coat')) { useSlot(run, run.slots[1] ? 1 : 0); run.coat.left = 3.2; }
+      const el = ['water', 'fire', 'ice', 'spark', 'stone', 'gas'].find(e => tok.has(e)); if (el) { run.slots = [el, null]; run.cool = [0, 0]; useSlot(run, 0); run.coat.left = 3.2; } ui.hud(run); }
     if (s === 'pause') ui.show('pause');
     if (s === 'clear') { clearOut = { stars: 2, reward: 17, next: levelById('w1-4') }; ui.show('clear', clearOut); }
     if (s === 'fail') ui.show('fail', { reason: run.level.gaps?.length ? 'fall' : run.level.enemies?.length ? 'caught' : run.level.deep?.length ? 'drown' : run.level.lava?.length ? 'lava' : run.level.fires ? 'fire' : tok.has('normal') ? 'trap' : 'timeout' });

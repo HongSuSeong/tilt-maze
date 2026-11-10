@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { FEEL } from './feel.js';
 import { drawBall } from './look.js';
+import { createAura } from './aura.js';
 
 const { BW, BH, RIM, R } = FEEL;
 const U = 0.1, WALL_H = 1.0, BAR_TOP = 92, BAR_BOTTOM = 92, VIEW_DEG = 62;
@@ -120,6 +121,7 @@ export function createView(container) {
   const board = new THREE.Group(); scene.add(board);
   const ball = new THREE.Mesh(new THREE.SphereGeometry(R * U, 40, 24), mat.ball); ball.castShadow = true;
   const coat = new THREE.Mesh(new THREE.SphereGeometry(R * U * 1.28, 32, 20), mat.coat); coat.visible = false;   // the element the ball wears
+  const aura = createAura();   // the element the ball wears, and the burst when it is put on
   const lamp = new THREE.PointLight('#fff2dd', 0, 5.5, 1.6); lamp.castShadow = false;   // in the dark, the ball carries the only light
   const trail = Array.from({ length: 24 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), mat.trail.clone()); m.visible = false; return { m, t: 9 }; });
   const bitGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16), coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 28);
@@ -210,7 +212,7 @@ export function createView(container) {
       const flame = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.6, 14), mat.flame); flame.position.y = 1.35; flame.visible = false; g.add(flame);
       board.add(g); return { g, flame };
     });
-    board.add(ball); board.add(coat); board.add(lamp); for (const t of trail) { t.m.visible = false; board.add(t.m); }
+    board.add(ball); board.add(coat); board.add(lamp); board.add(aura.group); for (const t of trail) { t.m.visible = false; board.add(t.m); }
     ball.quaternion.identity(); ball.visible = true; ball.scale.setScalar(1); coat.visible = false;
     paint();
   }
@@ -276,8 +278,9 @@ export function createView(container) {
     if (sp > 0.01 && b.fall === 0) { axis.set(b.vy, 0, -b.vx).normalize(); q.setFromAxisAngle(axis, sp * dt / R); ball.quaternion.premultiply(q); }
     const sink = b.fall > 0 ? Math.min(1, b.fall / 0.5) : 0;
     ball.position.set(X(b.x), R * U - sink * R * U * 2.4, Z(b.y)); ball.scale.setScalar(1 - sink * 0.3); ball.visible = b.fall < 0.9;
-    coat.visible = !!run.coat && ball.visible; coat.position.copy(ball.position); lamp.position.set(ball.position.x, 1.4, ball.position.z);
-    if (run.coat) { const k = run.coat.el === 'stone' ? 0.8 : 0.38; mat.coat.color.set(ELEMENT_COLOR[run.coat.el] || '#ffffff'); mat.coat.opacity = run.coat.left < 1.5 ? k * (0.5 + 0.5 * (Math.sin(clock * 18) > 0)) : k; }   // stone all but hides the ball   // blinks as it wears off
+    coat.visible = false; lamp.position.set(ball.position.x, 1.4, ball.position.z);
+    ball.scale.multiplyScalar(aura.update(run, ball, dt, clock));   // the element's shape round the ball, and its little bounce when put on
+    if (run.coat?.el === 'stone' && aura.group.children.some(f => f.visible)) ball.visible = false;   // inside the rock
     if (sp > FEEL.brk && b.fall === 0) { const t = trail[trailI++ % trail.length]; t.t = 0; t.m.position.copy(ball.position); t.m.visible = true; }
     for (const t of trail) if (t.m.visible) { t.t += dt; t.m.material.opacity = Math.max(0, 0.55 * (1 - t.t / 0.28)); t.m.scale.setScalar(Math.max(0.05, 1 - t.t * 2)); if (t.t > 0.28) t.m.visible = false; }
     for (let i = bits.length - 1; i >= 0; i--) {
@@ -300,9 +303,10 @@ export function createView(container) {
   }
 
   function setDark(on) { dark = !!on; paint(); }
+  function burst(el) { aura.burst(el, ball.position); }
   function setLook(look) { mat.ball.map?.dispose(); mat.ball.map = ballTex(look); mat.ball.needsUpdate = true; }
   function destroy() { clear(); renderer.dispose(); renderer.domElement.remove(); }
 
   paint(); resize();
-  return { load, update, setDark, setLook, resize, destroy };
+  return { load, update, setDark, setLook, burst, resize, destroy };
 }
