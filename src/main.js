@@ -4,6 +4,7 @@ import { createView } from './render3d.js';
 import { createTilt } from './tilt.js';
 import { createUI } from './ui.js';
 import { createSound } from './sound.js';
+import { createMusic } from './music.js';
 import { T } from './text.js';
 import { levelById } from './levels/index.js';
 import { levelsFor } from './difficulty.js';
@@ -14,6 +15,7 @@ import { buy, buyBoost, COLORS, PATTERNS, THEMES, BOOST_PRICES } from './shop.js
 
 let save = loadSave();
 const tilt = createTilt(), keys = {}, view = createView(document.body), sound = createSound(() => save.opt);
+const music = createMusic(() => sound.context(), () => save.opt.music !== false);
 let run = null, mode = 'home', unlocked = false, notice = '', wake = null;
 const unlockAll = new URLSearchParams(location.search).has('unlock');   // for trying any stage: opens everything built, keeps none of it
 const keep = () => writeSave(save);
@@ -28,7 +30,7 @@ addEventListener('resize', () => view.resize());
 
 // The first tap opens the sensor (iPhones ask), the sound, and keeps the screen awake while playing.
 async function unlock() {
-  if (unlocked) return; unlocked = true; sound.unlock();
+  if (unlocked) return; unlocked = true; sound.unlock(); music.start();
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
     try { if (await DeviceOrientationEvent.requestPermission() !== 'granted') notice = T.sensorDenied; } catch { notice = T.sensorDenied; }
   }
@@ -38,7 +40,7 @@ async function stayAwake() { try { wake = await navigator.wakeLock?.request('scr
 
 function load(id) {
   const ls = levelsFor(save.diff), level = ls.find(l => l.id === id) || ls[0];
-  run = createRun(level, save.diff); run.boost = save.boost; view.load(level); theme();
+  run = createRun(level, save.diff); run.boost = save.boost; view.load(level); theme(); music.setWorld(level.world);
 }
 function goHome() {
   mode = 'home'; save = markOpened(save);
@@ -59,7 +61,7 @@ const ui = createUI(document.body, {
   skipRest() { if (skipRest(run, save)) { keep(); ready(); } },
   openSettings() { ui.show('settings', { opt: save.opt }); },
   closeSettings() { ui.closeSettings(); if (mode === 'home') goHome(); },
-  setOpt(k, v) { save.opt = { ...save.opt, [k]: v }; keep(); if (k === 'dark') theme(); },
+  setOpt(k, v) { save.opt = { ...save.opt, [k]: v }; keep(); if (k === 'dark') theme(); if (k === 'music') music.setOn(v); },
   zero() { tilt.calibrate(); ui.toast(T.zeroDone); },
   openShop() { mode = 'shop'; ui.show('shop', { save }); },
   closeShop() { goHome(); },
@@ -93,6 +95,7 @@ function showRest() { mode = 'rest'; ui.show('rest', { left: run.restLeft, canSk
 let clearOut = null;
 
 addEventListener('visibilitychange', () => {   // away from the game: stop the clock where it is
+  sound.hush(document.hidden);
   if (document.hidden && run?.phase === 'play') { pauseRun(run); mode = 'pause'; ui.show('pause'); }
   if (!document.hidden && run && (mode === 'play' || mode === 'pause')) stayAwake();
 });

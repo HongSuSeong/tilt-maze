@@ -209,16 +209,16 @@ export function createUI(root, h) {
   }
 
   function settings(opt) {
-    const tg = (k, f) => `<button data-opt="${k}" aria-pressed="${opt[k]}">${f(opt[k])}</button>`;
+    const tg = (k, f) => `<button data-opt="${k}" aria-pressed="${opt[k] !== false}">${f(opt[k] !== false)}</button>`;   // a setting added later is on until turned off
     $('sheet').innerHTML = `<h2>${T.settings}</h2>
       <div class="field"><div class="row"><label for="sens">${T.sens}</label><output id="sensV">${Math.round(opt.sens * 100)}%</output></div>
         <input id="sens" type="range" min="0.5" max="1.5" step="0.05" value="${opt.sens}"><p>${T.sensNote}</p></div>
-      <div class="toggles">${tg('snd', T.sound)}${tg('vib', T.vib)}${tg('dark', T.dark)}</div>
+      <div class="toggles">${tg('music', T.music)}${tg('snd', T.sound)}${tg('vib', T.vib)}${tg('dark', T.dark)}</div>
       <div class="row" style="display:flex;gap:10px"><button id="zeroBtn" style="flex:1">${T.zero}</button><button class="go" id="closeBtn" style="flex:1">${T.close}</button></div>`;
     $('sheet').querySelector('#sens').addEventListener('input', e => { h.setOpt('sens', +e.target.value); $('sheet').querySelector('#sensV').textContent = `${Math.round(e.target.value * 100)}%`; });
     for (const b of $('sheet').querySelectorAll('[data-opt]')) b.addEventListener('click', () => {
       const k = b.dataset.opt, on = b.getAttribute('aria-pressed') !== 'true';
-      h.setOpt(k, on); b.setAttribute('aria-pressed', String(on)); b.textContent = { snd: T.sound, vib: T.vib, dark: T.dark }[k](on);
+      h.setOpt(k, on); b.setAttribute('aria-pressed', String(on)); b.textContent = { music: T.music, snd: T.sound, vib: T.vib, dark: T.dark }[k](on);
     });
     $('sheet').querySelector('#zeroBtn').addEventListener('click', h.zero);
     $('sheet').querySelector('#closeBtn').addEventListener('click', h.closeSettings);

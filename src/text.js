@@ -26,6 +26,7 @@ export const T = {
   rest: '잠깐 쉬어요', restWhy: '같은 단계를 세 번 놓쳤어요.', restLeft: s => `${s}초`, restLater: '뒤에 다시 할 수 있어요', restSkip: '코인 10개로 바로 하기',
   sens: '민감도', sensNote: '같은 기울기에서 공이 얼마나 빨리 구르는지 정합니다.',
   sound: on => (on ? '소리 켜짐' : '소리 꺼짐'), vib: on => (on ? '진동 켜짐' : '진동 꺼짐'), dark: on => (on ? '다크 모드 켜짐' : '다크 모드 꺼짐'),
+  music: on => (on ? '음악 켜짐' : '음악 꺼짐'),
   zero: '수평 다시 잡기', zeroDone: '지금 자세를 수평으로 잡았어요', close: '닫기',
   sensorDenied: '동작 센서가 거부되었어요. 설정 > Safari > 동작 및 방향 접근을 켜고 다시 열어 주세요.',
   noSensor: '이 기기에는 기울기 센서가 없어요. 방향키로 움직일 수 있어요.',

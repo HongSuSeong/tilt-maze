@@ -10,6 +10,8 @@ export function createSound(opt) {
   const buzz = p => { if (opt().vib && navigator.vibrate) navigator.vibrate(p); };
   return {
     unlock() { if (!ac) try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; } ac?.resume?.(); },
+    context: () => ac,   // shared with the music
+    hush(away) { if (away) ac?.suspend?.(); else ac?.resume?.(); },   // silent while the page is not shown
     knock(speed) { const k = Math.min(1, speed / 600); if (k < 0.05) return; tone(170 + 140 * k, 60, 0.1, 0.45 * k); buzz(Math.round(8 + 22 * k)); },
     crash() {
       buzz([30, 20, 40]); if (!ac || !opt().snd) return;
