@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { COLORS, PATTERNS, BOOST_PRICES, buy, buyBoost, paintPalette, clears, nextPaintAt } from '../src/shop.js';
+import { COLORS, PATTERNS, THEMES, BOOST_PRICES, buy, buyBoost, paintPalette, clears, nextPaintAt } from '../src/shop.js';
+import { loadSave } from '../src/save.js';
 import { defaultSave } from '../src/save.js';
 
 const rich = (coins = 500) => ({ ...defaultSave(), coins });
@@ -30,5 +31,15 @@ describe('shop', () => {
     s.prog.easy.best = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`w1-${i + 1}`, { stars: 1, time: 9 }]));
     s.prog.normal.best = { 'w1-1': { stars: 1, time: 9 }, 'w1-2': { stars: 1, time: 9 }, 'w1-3': { stars: 1, time: 9 }, 'w1-4': { stars: 1, time: 9 }, 'w1-5': { stars: 1, time: 9 }, 'w1-6': { stars: 1, time: 9 } };
     expect(clears(s)).toBe(16); expect(paintPalette(s)).toHaveLength(6); expect(nextPaintAt(s)).toBe(24);
+  });
+  it('three themes: the soft toy free, paper and cartoon at 80', () => {
+    expect(THEMES.map(t => [t.id, t.price])).toEqual([['toy', 0], ['paper', 80], ['toon', 80]]);
+    const s = defaultSave(); expect(s.theme).toBe('toy'); expect(s.owned.themes).toEqual(['toy']);
+    const out = buy(rich(80), 'themes', 'paper'); expect(out.ok).toBe(true); expect(out.save.owned.themes).toEqual(['toy', 'paper']); expect(out.save.coins).toBe(0);
+  });
+  it('a save from before themes gets the soft toy, and keeps what it bought', () => {
+    const old = { ...defaultSave(), owned: { patterns: ['dots', 'stripes', 'check'], colors: ['coral', 'mint', 'cream'] } }; delete old.theme;
+    const st = { getItem: () => JSON.stringify(old), setItem() {} }, s = loadSave(st);
+    expect(s.theme).toBe('toy'); expect(s.owned.themes).toEqual(['toy']); expect(s.owned.patterns).toContain('check');
   });
 });

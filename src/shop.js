@@ -11,10 +11,11 @@ export const PATTERNS = [
   { id: 'dots', name: '물방울', price: 0 }, { id: 'stripes', name: '줄무늬', price: 0 }, { id: 'check', name: '체크', price: 20 },
   { id: 'half', name: '반반', price: 30 }, { id: 'stars', name: '별', price: 40 }, { id: 'rainbow', name: '무지개', price: 60 },
 ];
+export const THEMES = [{ id: 'toy', name: '말랑 장난감', price: 0 }, { id: 'paper', name: '종이 오리기', price: 80 }, { id: 'toon', name: '선명한 만화', price: 80 }];
 export const BOOST_PRICES = [50, 100, 200];   // each step: elements are worn a second longer
 export const colorHex = id => (COLORS.find(c => c.id === id) || COLORS[0]).hex;
 
-const CATALOG = { colors: COLORS, patterns: PATTERNS };
+const CATALOG = { colors: COLORS, patterns: PATTERNS, themes: THEMES };
 export function buy(save, kind, id) {
   const item = CATALOG[kind]?.find(x => x.id === id);
   if (!item || save.owned[kind].includes(id) || save.coins < item.price) return { ok: false, save };

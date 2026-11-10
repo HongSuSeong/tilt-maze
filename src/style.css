@@ -11,6 +11,17 @@
   color-scheme: dark;
 }
 [hidden] { display: none !important; }
+/* the paper look: hand-lettered, square-ish cut paper with a shadow off to the side */
+:root[data-look="paper"] body, :root[data-look="paper"] button { font-family: 'Gaegu', 'Jua', sans-serif; font-weight: 700; }
+:root[data-look="paper"] .pill, :root[data-look="paper"] button, :root[data-look="paper"] .card, :root[data-look="paper"] .purse, :root[data-look="paper"] .hint, :root[data-look="paper"] .toast { border-radius: 6px; box-shadow: 3px 4px 0 rgba(24, 58, 87, .28); }
+:root[data-look="paper"] button:active:not(:disabled) { box-shadow: 1px 1px 0 rgba(24, 58, 87, .28); }
+/* the cartoon look: bold letters, everything drawn with a thick dark line */
+:root { --line: #2B1B5A; }
+:root[data-theme="dark"] { --line: #0B0820; }
+:root[data-look="toon"] body, :root[data-look="toon"] button { font-family: 'Do Hyeon', 'Jua', sans-serif; }
+:root[data-look="toon"] .pill, :root[data-look="toon"] button, :root[data-look="toon"] .card, :root[data-look="toon"] .purse, :root[data-look="toon"] .hint, :root[data-look="toon"] .toast { border: 3px solid var(--line); box-shadow: 0 4px 0 var(--line); }
+:root[data-look="toon"] button:active:not(:disabled) { box-shadow: 0 1px 0 var(--line); }
+
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; touch-action: none; background: var(--bg); color: var(--ink);
   font: 16px/1.35 'Jua', -apple-system, 'Apple SD Gothic Neo', sans-serif; user-select: none; -webkit-user-select: none; }
@@ -109,6 +120,17 @@ button.go:active:not(:disabled) { box-shadow: 0 2px 0 var(--go-edge); }
 .dots i { aspect-ratio: 1; border-radius: 3px; }
 .card.flat { box-shadow: 0 6px 0 var(--edge); }
 .home .note { margin: 0; font-size: 13px; color: var(--mute); text-align: center; }
+
+/* the theme cards: three little strips of what each look is made of */
+.themes { display: grid; gap: 10px; }
+.themes button { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; text-align: left; min-height: 64px; }
+.themes button[aria-pressed="true"] { outline: 3px solid var(--go); outline-offset: 2px; }
+.themes b { font-weight: 400; font-size: 18px; }
+.themes small { color: var(--mute); font-size: 13px; }
+.look { display: grid; grid-template-columns: repeat(3, 1fr); height: 40px; border-radius: 10px; overflow: hidden; }
+.look.toy i:nth-child(1) { background: #C7EFDB; } .look.toy i:nth-child(2) { background: #FFFFFF; } .look.toy i:nth-child(3) { background: #FF6E5E; }
+.look.paper i:nth-child(1) { background: #A8DCF8; } .look.paper i:nth-child(2) { background: #FFE45C; } .look.paper i:nth-child(3) { background: #FFFFFF; }
+.look.toon i:nth-child(1) { background: #F1E8FF; } .look.toon i:nth-child(2) { background: #7B5CFF; } .look.toon i:nth-child(3) { background: #2B1B5A; }
 
 /* settings */
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 26px 26px 0 0; box-shadow: 0 -6px 30px rgba(36, 69, 60, .18); display: grid; gap: 16px;

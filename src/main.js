@@ -10,7 +10,7 @@ import { levelsFor } from './difficulty.js';
 import { loadSave, writeSave, markOpened, reachedOf, isOpen } from './save.js';
 import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear, useSlot, setSlots, SKIP_COST } from './run.js';
 import { ownedFor } from './elements.js';
-import { buy, buyBoost, COLORS, PATTERNS, BOOST_PRICES } from './shop.js';
+import { buy, buyBoost, COLORS, PATTERNS, THEMES, BOOST_PRICES } from './shop.js';
 
 let save = loadSave();
 const tilt = createTilt(), keys = {}, view = createView(document.body), sound = createSound(() => save.opt);
@@ -18,6 +18,7 @@ let run = null, mode = 'home', unlocked = false, notice = '', wake = null;
 const unlockAll = new URLSearchParams(location.search).has('unlock');   // for trying any stage: opens everything built, keeps none of it
 const keep = () => writeSave(save);
 const angle = () => (window.screen.orientation?.angle ?? window.orientation ?? 0);
+const applyTheme = () => { document.documentElement.dataset.look = save.theme; view.setTheme(save.theme); };   // the look bought in the shop
 const theme = () => { document.documentElement.dataset.theme = save.opt.dark ? 'dark' : 'light'; view.setDark(save.opt.dark); };
 
 addEventListener('deviceorientation', e => { if (e.beta != null) tilt.feed(e); });
@@ -64,13 +65,15 @@ const ui = createUI(document.body, {
   closeShop() { goHome(); },
   setLook(patch) { save = { ...save, look: { ...save.look, ...patch } }; keep(); view.setLook(save.look); ui.show('shop', { save }); },
   buyOrUse(kind, id, slot) {   // a thing owned is put on; one not owned is bought first, if the coins are there
-    const patch = kind === 'patterns' ? { mode: 'pattern', pattern: id } : { [slot]: id };
-    if (save.owned[kind].includes(id)) return this.setLook(patch);
-    const item = (kind === 'colors' ? COLORS : PATTERNS).find(x => x.id === id);
+    const patch = kind === 'patterns' ? { mode: 'pattern', pattern: id } : { [slot]: id }, put = () => (kind === 'themes' ? this.setTheme(id) : this.setLook(patch));
+    if (save.owned[kind].includes(id)) return put();
+    const item = ({ colors: COLORS, patterns: PATTERNS, themes: THEMES })[kind].find(x => x.id === id);
     if (save.coins < item.price) return ui.toast(T.needCoins(item.price - save.coins));
-    ui.ask(T.askBuy(kind, item.name, item.price), { ...save.look, ...patch }, () => {
-      save = buy(save, kind, id).save; ui.toast(T.bought(item.name)); sound.ding(); this.setLook(patch);
+    ui.ask(T.askBuy(kind, item.name, item.price), kind === 'themes' ? null : { ...save.look, ...patch }, () => {
+      save = buy(save, kind, id).save; ui.toast(T.bought(item.name)); sound.ding(); put();
     });
+  },
+  setTheme(id) { save = { ...save, theme: id }; keep(); applyTheme(); ui.show('shop', { save });
   },
   buyBoost() {
     const price = BOOST_PRICES[save.boost];
@@ -134,7 +137,8 @@ if (shot) {
   if (tok.has('dark')) save.opt.dark = true;
   if (tok.has('normal')) save.diff = 'normal';
   for (const d of ['hard', 'hell', 'god']) if (tok.has(d)) save.diff = d;
-  if (shot[1] === 'shop') { save.coins = 128; save.owned.colors.push('sky', 'grape'); mode = 'shop'; ui.show('shop', { save }); for (const t of ['draw', 'boost']) if (tok.has(t)) document.querySelector(`[data-tab="${t}"]`).click(); if (tok.has('ask')) document.querySelector('[data-pattern="stars"]').click(); }
+  for (const t of ['paper', 'toon']) if (tok.has(t)) { save.theme = t; applyTheme(); }
+  if (shot[1] === 'shop') { save.coins = 128; save.owned.colors.push('sky', 'grape'); mode = 'shop'; ui.show('shop', { save }); for (const t of ['draw', 'theme', 'boost']) if (tok.has(t)) document.querySelector(`[data-tab="${t}"]`).click(); if (tok.has('ask')) document.querySelector('[data-pattern="stars"]').click(); }
   else if (shot[1] === 'home') {
     save.coins = 128; save.prog.easy = { reached: 'w1-10', best: Object.fromEntries(levelsFor('easy').map((l, i) => [l.id, { stars: 1 + i % 3, time: 20 }])) };
     goHome();
@@ -152,5 +156,5 @@ if (shot) {
   }
 } else goHome();
 if (new URLSearchParams(location.search).has('test')) window.__tm = { get run() { return run; } };   // read-only peek for tools/smoke.mjs
-view.setLook(save.look); theme();
+view.setLook(save.look); applyTheme(); theme();
 requestAnimationFrame(frame);

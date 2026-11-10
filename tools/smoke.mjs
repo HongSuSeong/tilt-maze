@@ -105,6 +105,14 @@ try {
   const look = await page.evaluate(() => JSON.parse(localStorage.getItem('tilt-maze:v1')).look);
   check(look.mode === 'pixels' && look.pixels[20] === 'ink', 'the drawing is worn and kept');
   check((await page.evaluate(() => JSON.parse(localStorage.getItem('tilt-maze:v1')).owned.patterns)).includes('check'), 'and the pattern stays bought');
+  // a theme: bought from the dress-up page, and the whole page takes the look
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('tilt-maze:v1')); s.coins = 100; localStorage.setItem('tilt-maze:v1', JSON.stringify(s)); });
+  await page.goto(`http://localhost:${PORT}/tilt-maze/?test`);
+  await page.getByRole('button', { name: '꾸미기' }).click(); await page.getByRole('tab', { name: '테마' }).click();
+  await page.getByRole('button', { name: /선명한 만화/ }).click(); await page.getByRole('button', { name: '사기' }).click();
+  check(await page.evaluate(() => document.documentElement.dataset.look) === 'toon', 'the cartoon theme is bought and worn');
+  await page.reload();
+  check(await page.evaluate(() => document.documentElement.dataset.look) === 'toon', 'and stays after a reload');
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } finally { await browser.close(); srv.kill(); }
 console.log(ok ? 'ALL PASS' : 'FAILED'); process.exitCode = ok ? 0 : 1;

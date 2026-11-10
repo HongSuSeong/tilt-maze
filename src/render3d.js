@@ -33,9 +33,19 @@ function canvasTex(w, h, paint) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
-const floorTex = p => canvasTex(512, 820, (g, w, h) => {
+// The three looks the shop sells: the soft toy (rounded white blocks, a dotted floor), cut paper (flat yellow paper
+// walls with crisp edges and long shadows, a fibred floor) and the bold cartoon (purple blocks with dark outlines, a
+// checked floor). Each world still tints the floor.
+const THEME = {
+  toy: { light: {}, dark: {}, floor: 'dots', round: 0.22, outline: null },
+  paper: { light: { wall: '#FFE45C', base: '#FFFFFF' }, dark: { wall: '#B8A24A', base: '#2C2C2C' }, floor: 'fibre', round: 0.03, outline: null, sun: [-7, 9, 3] },
+  toon: { light: { wall: '#7B5CFF', base: '#FFFFFF' }, dark: { wall: '#5A3FD9', base: '#1C1830' }, floor: 'check', round: 0.15, outline: '#2B1B5A' },
+};
+const floorTex = (p, style = 'dots') => canvasTex(512, 820, (g, w, h) => {
   g.fillStyle = p.floor; g.fillRect(0, 0, w, h); g.fillStyle = p.dot;
-  for (let y = 9; y < h; y += 18) for (let x = 9; x < w; x += 18) { g.beginPath(); g.arc(x, y, 2, 0, 7); g.fill(); }
+  if (style === 'dots') for (let y = 9; y < h; y += 18) for (let x = 9; x < w; x += 18) { g.beginPath(); g.arc(x, y, 2, 0, 7); g.fill(); }
+  if (style === 'check') for (let y = 0; y < h; y += 41) for (let x = 0; x < w; x += 41) if ((x + y) / 41 % 2 === 0) g.fillRect(x, y, 41, 41);
+  if (style === 'fibre') { g.globalAlpha = 0.5; for (let i = 0; i < 900; i++) { const x = (i * 197) % w, y = (i * 389) % h; g.fillRect(x, y, 2 + (i % 5), 1); } g.globalAlpha = 1; }
 });
 const crackTex = p => canvasTex(256, 64, (g, w, h) => {
   g.fillStyle = p.crack; g.fillRect(0, 0, w, h); g.strokeStyle = p.crackLine; g.lineWidth = 5;
@@ -147,13 +157,17 @@ export function createView(container) {
   const lamp = new THREE.PointLight('#fff2dd', 0, 5.5, 1.6); lamp.castShadow = false;   // in the dark, the ball carries the only light
   const trail = Array.from({ length: 24 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), mat.trail.clone()); m.visible = false; return { m, t: 9 }; });
   const bitGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16), coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 28);
+  let theme = 'toy';
+  const outlineMat = new THREE.MeshBasicMaterial({ color: '#2B1B5A', side: THREE.BackSide });
+  const ballEdge = new THREE.Mesh(new THREE.SphereGeometry(R * U, 24, 16), outlineMat); ballEdge.scale.setScalar(1.14); ball.add(ballEdge);   // the cartoon look outlines the ball too
   let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], zapMats = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
 
   function paint() {
-    const p = { ...(dark ? PALETTE.dark : PALETTE.light), ...WORLD_TINT[level?.world]?.[dark ? 'dark' : 'light'] };
+    const Th = THEME[theme], p = { ...(dark ? PALETTE.dark : PALETTE.light), ...WORLD_TINT[level?.world]?.[dark ? 'dark' : 'light'], ...Th[dark ? 'dark' : 'light'] };
     scene.background = new THREE.Color(p.bg);
-    mat.floor.map?.dispose(); mat.floor.map = floorTex(p); mat.floor.needsUpdate = true;
+    mat.floor.map?.dispose(); mat.floor.map = floorTex(p, Th.floor); mat.floor.needsUpdate = true;
+    sun.position.set(...(Th.sun || [-5, 14, 7])); outlineMat.color.set(dark ? '#0B0820' : Th.outline || '#2B1B5A'); ballEdge.visible = !!Th.outline;
     mat.crack.map?.dispose(); mat.crack.map = crackTex(p); mat.crack.emissiveIntensity = dark ? 0.15 : 0; mat.crack.needsUpdate = true;
     mat.wall.color.set(p.wall); mat.base.color.set(p.base); mat.hole.color.set(p.hole); mat.lip.color.set(p.lip); mat.ring.color.set(p.ring); mat.trap.color.set(p.trap);
     mat.coin.emissiveIntensity = p.glow;
@@ -165,8 +179,9 @@ export function createView(container) {
     if (m.map && m !== mat.wall) {   // a patterned wall gets its own copy of the pattern, repeated along it instead of stretched
       const down = w.h > w.w; m = m.clone(); m.map = repeated(m.map, Math.round(Math.max(w.w, w.h) / 22), down);
     }
-    const g = new RoundedBoxGeometry(w.w * U, WALL_H, w.h * U, 3, Math.min(0.22, Math.min(w.w, w.h) * U * 0.45));
+    const g = new RoundedBoxGeometry(w.w * U, WALL_H, w.h * U, 3, Math.min(THEME[theme].round, Math.min(w.w, w.h) * U * 0.45));
     const mesh = new THREE.Mesh(g, m); mesh.position.set(X(w.x + w.w / 2), WALL_H / 2, Z(w.y + w.h / 2)); mesh.castShadow = mesh.receiveShadow = true;
+    if (THEME[theme].outline) { const e = new THREE.Mesh(g, outlineMat); e.scale.set(1 + 0.12 / (w.w * U), 1.08, 1 + 0.12 / (w.h * U)); mesh.add(e); }   // a dark edge round every block
     board.add(mesh); return mesh;
   }
 
@@ -343,10 +358,11 @@ export function createView(container) {
   }
 
   function setDark(on) { dark = !!on; paint(); }
+  function setTheme(id) { theme = THEME[id] ? id : 'toy'; if (level) load(level); }   // the blocks are rebuilt in the new look
   function burst(el) { aura.burst(el, ball.position); }
   function setLook(look) { mat.ball.map?.dispose(); mat.ball.map = ballTex(look); mat.ball.needsUpdate = true; }
   function destroy() { clear(); renderer.dispose(); renderer.domElement.remove(); }
 
   paint(); resize();
-  return { load, update, setDark, setLook, burst, resize, destroy };
+  return { load, update, setDark, setLook, setTheme, burst, resize, destroy };
 }

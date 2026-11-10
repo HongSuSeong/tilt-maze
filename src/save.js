@@ -12,7 +12,7 @@ const progFresh = () => Object.fromEntries(BUILT.map(d => [d, { best: {}, reache
 // without them takes these
 const extras = () => ({
   look: { mode: 'pattern', pattern: 'dots', base: 'coral', accent: 'cream', pixels: Array(128).fill(null) },
-  owned: { patterns: ['dots', 'stripes'], colors: ['coral', 'mint', 'cream'] }, boost: 0,
+  owned: { patterns: ['dots', 'stripes'], colors: ['coral', 'mint', 'cream'], themes: ['toy'] }, boost: 0, theme: 'toy',
 });
 export const defaultSave = () => ({ v: V, coins: 0, diff: 'easy', prog: progFresh(), opened: ['easy'], opt: { sens: 1, snd: true, vib: true, dark: false }, ...extras() });
 
@@ -20,7 +20,7 @@ export const defaultSave = () => ({ v: V, coins: 0, diff: 'easy', prog: progFres
 const openedThen = s => ['easy', ...(levelsFor('easy').filter(l => l.world === 1).every(l => s.prog.easy.best[l.id]) ? ['normal'] : [])];
 
 function migrate(s) {
-  if (s?.v === V) { const m = { ...extras(), ...s, prog: { ...progFresh(), ...s.prog } }; return m.opened ? m : { ...m, opened: openedThen(m) }; }   // a difficulty added later starts empty
+  if (s?.v === V) { const x = extras(), m = { ...x, ...s, owned: { ...x.owned, ...s.owned }, prog: { ...progFresh(), ...s.prog } }; return m.opened ? m : { ...m, opened: openedThen(m) }; }   // a difficulty added later starts empty
   if (s?.v === 1) {
     const d = defaultSave(), m = { ...d, coins: s.coins ?? 0, opt: { ...d.opt, ...s.opt }, prog: { ...d.prog, easy: { best: s.best || {}, reached: s.reached || 't1' } } };
     return { ...m, opened: openedThen(m) };

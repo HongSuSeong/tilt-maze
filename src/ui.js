@@ -4,7 +4,7 @@ import { T } from './text.js';
 import { DIFFS, BUILT, levelsFor } from './difficulty.js';
 import { isOpen, reachedOf } from './save.js';
 import { ELEMENTS, ownedFor } from './elements.js';
-import { COLORS, PATTERNS, BOOST_PRICES, paintPalette, nextPaintAt, clears } from './shop.js';
+import { COLORS, PATTERNS, THEMES, BOOST_PRICES, paintPalette, nextPaintAt, clears } from './shop.js';
 import { drawBall, drawPreview, DOT_W, DOT_H } from './look.js';
 
 const STAR = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.6l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z" fill="${on ? 'var(--star)' : 'var(--star-off)'}" stroke="${on ? '#E9A91A' : 'none'}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
@@ -158,13 +158,14 @@ export function createUI(root, h) {
         <div class="sws paint">${pal.map(c => `<button class="sw" data-paint="${c.id}" aria-pressed="${paint === c.id}" aria-label="${c.name}" style="--sw:${c.hex}"></button>`).join('')}<button class="sw eraser" data-paint="" aria-pressed="${paint === ''}" aria-label="${T.eraser}">✕</button></div>
         <p class="note">${next ? T.paintMore(next - clears(save)) : T.paintAll}</p>
         <div class="row2"><button id="clearDots">${T.clearAll}</button><button class="go" id="wearDots">${look.mode === 'pixels' && draft.every((c, i) => c === look.pixels[i]) ? T.wearing : T.wear}</button></div>`,
+      theme: `<div class="themes">${THEMES.map(t => `<button data-theme="${t.id}" aria-pressed="${save.theme === t.id}"><span class="look ${t.id}" aria-hidden="true"><i></i><i></i><i></i></span><b>${t.name}</b>${save.owned.themes.includes(t.id) ? `<small>${save.theme === t.id ? T.themeOn : T.themeUse}</small>` : price(t.price)}</button>`).join('')}</div>`,
       boost: `<div class="card flat"><h2>${T.boostName}</h2><p>${T.boostNow(save.boost)}</p>
         ${save.boost < BOOST_PRICES.length ? `<button class="go" id="buyBoost"><span class="coin"></span> ${T.boostNext(save.boost, BOOST_PRICES[save.boost])}</button>` : `<p>${T.boostMax}</p>`}</div>`,
     }[tab];
     $('shop').innerHTML = `<div class="inner">
       <header><button data-do="closeShop">← ${T.back}</button><span class="purse"><span class="coin"></span>${save.coins}</span></header>
       <canvas id="preview" class="preview" width="132" height="132" aria-hidden="true"></canvas>
-      <div class="chips tabs" role="tablist">${[['ball', T.tabBall], ['draw', T.tabDraw], ['boost', T.tabBoost]].map(([k, n]) => `<button role="tab" data-tab="${k}" aria-pressed="${tab === k}" aria-selected="${tab === k}">${n}</button>`).join('')}</div>
+      <div class="chips tabs" role="tablist">${[['ball', T.tabBall], ['draw', T.tabDraw], ['theme', T.tabTheme], ['boost', T.tabBoost]].map(([k, n]) => `<button role="tab" data-tab="${k}" aria-pressed="${tab === k}" aria-selected="${tab === k}">${n}</button>`).join('')}</div>
       <section>${body}</section></div>`;
     const S = $('shop'), on = (sel, f) => { for (const b of S.querySelectorAll(sel)) b.addEventListener('click', () => f(b)); };
     on('[data-do]', b => h[b.dataset.do]());
@@ -176,6 +177,7 @@ export function createUI(root, h) {
     on('#clearDots', () => { draft = Array(DOT_W * DOT_H).fill(null); shop(save); });
     on('#wearDots', () => h.setLook({ mode: 'pixels', pixels: [...draft] }));
     on('#buyBoost', () => h.buyBoost());
+    on('[data-theme]', b => h.buyOrUse('themes', b.dataset.theme));
     const dots = S.querySelector('#dots');
     if (dots) {   // paint by touching and dragging over the cells
       let down = false;
