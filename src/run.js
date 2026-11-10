@@ -2,9 +2,9 @@
 import { createBall, stepBall } from './physics.js';
 import { recordClear } from './save.js';
 import { nextLevel } from './levels/index.js';
-import { ELEMENTS, defaultSlots } from './elements.js';
+import { ELEMENTS, FUSIONS, fusionOf, defaultSlots } from './elements.js';
 
-export const REST = 30, SKIP_COST = 10, FAILS_TO_REST = 3;
+export const REST = 30, SKIP_COST = 10, FAILS_TO_REST = 3, DASH_V = 520;
 
 const fresh = run => Object.assign(run, {
   ball: createBall(run.level.start.x, run.level.start.y), state: { broken: new Set(), got: new Set(), doused: new Set() }, left: run.level.time, coins: 0, reason: null,
@@ -17,13 +17,31 @@ export function createRun(level, diff = 'easy', slots) {
   return fresh({ level, diff, slots: [...slots], phase: 'ready', fails: 0, restLeft: 0 }); }
 export function setSlots(run, slots) { run.slots = [...slots]; }
 
-// Wear the element in slot i: it lasts its time, and the slot can be used again its rest after that.
+// Wear the element in slot i: it lasts its time, and the slot can be used again its rest after that. Pressed while the
+// other slot's element is worn, and the two have a recipe, they fuse: both slots rest the fusion's time and three more.
 export function useSlot(run, i) {
   const el = run.slots[i];
   if (run.phase !== 'play' || !el || run.cool[i] > 0) return false;
+  if (canFuse(run, i)) {
+    const f = fusionOf(run.coat.el, el), dur = FUSIONS[f].dur + (run.boost || 0);
+    run.coat = { el: f, left: dur, dur, of: [run.coat.el, el], fused: true, ...(f === 'blast' && { kick: true }) };
+    run.cool = run.cool.map(() => dur + 3); run.state.snow = 0;
+    return true;
+  }
   const dur = ELEMENTS[el].dur + (run.boost || 0);   // the shop's boost: a second longer a step
-  run.coat = { el, left: dur }; run.cool[i] = dur + ELEMENTS[el].cool;
+  run.coat = { el, left: dur, dur, slot: i }; run.cool[i] = dur + ELEMENTS[el].cool;
   return true;
+}
+// Would pressing slot i now make a fusion? (The slot glows when it would.)
+export function canFuse(run, i) {
+  const c = run.coat;
+  return run.phase === 'play' && !!c && !c.fused && c.slot !== i && run.cool[i] <= 0 && !!fusionOf(c.el, run.slots[i]);
+}
+// The blast's throw: the way the board leans, or on a level board the way the ball was going.
+function kick(run, tilt) {
+  const b = run.ball, t = Math.hypot(tilt.x, tilt.y), v = Math.hypot(b.vx, b.vy);
+  const [dx, dy] = t >= 2 ? [tilt.x / t, tilt.y / t] : v > 0 ? [b.vx / v, b.vy / v] : [0, 0];
+  b.vx = dx * DASH_V; b.vy = dy * DASH_V; run.coat.kick = false;
 }
 export function startRun(run) { if (run.phase === 'ready') run.phase = 'play'; }
 export function pauseRun(run) { if (run.phase === 'play') run.phase = 'paused'; }
@@ -31,6 +49,7 @@ export function resumeRun(run) { if (run.phase === 'paused') run.phase = 'play';
 
 export function tickRun(run, tilt, dt, sens) {
   if (run.phase !== 'play') return [];
+  if (run.coat?.kick) kick(run, tilt);
   const ev = stepBall(run.ball, tilt, dt, run.level, run.state, sens, run.coat?.el ?? null);
   if (run.coat && (run.coat.left -= dt) <= 0) run.coat = null;
   run.cool = run.cool.map(c => Math.max(0, c - dt));

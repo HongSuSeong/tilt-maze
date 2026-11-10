@@ -17,7 +17,7 @@ describe('elements', () => {
   it('the slots fill with what is owned', () => { expect(defaultSlots({ world: 1 })).toEqual([null, null]); expect(defaultSlots({ world: 2 })).toEqual(['water', null]); expect(defaultSlots({ world: 3 })).toEqual(['water', 'fire']); expect(defaultSlots({ world: 4 })).toEqual(['fire', 'ice']); });
   it('a slot coats the ball for five seconds, then rests three', () => {
     const r = createRun(L()); startRun(r);
-    expect(useSlot(r, 0)).toBe(true); expect(r.coat).toEqual({ el: 'water', left: 5 });
+    expect(useSlot(r, 0)).toBe(true); expect(r.coat).toMatchObject({ el: 'water', left: 5 });
     expect(useSlot(r, 0)).toBe(false);
     play(r, flat, 5.05); expect(r.coat).toBe(null);
     expect(useSlot(r, 0)).toBe(false); play(r, flat, 3); expect(useSlot(r, 0)).toBe(true);
