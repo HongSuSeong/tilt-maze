@@ -45,7 +45,7 @@ export function createUI(root, h) {
   let toastT = 0;
 
   function card(html, see = true) {   // see: the board stays clear behind the card
-    $('card').innerHTML = html; $('scrim').classList.toggle('clear-bg', see); $('scrim').hidden = false;
+    $('card').innerHTML = html; $('card').classList.remove('compact'); $('scrim').classList.toggle('clear-bg', see); $('scrim').hidden = false;
     for (const b of $('card').querySelectorAll('[data-do]')) b.addEventListener('click', () => h[b.dataset.do]());
   }
   const bars = on => { $('hud').hidden = $('dock').hidden = !on; };
@@ -88,7 +88,10 @@ export function createUI(root, h) {
       case 'home': bars(false); home(d); break;
       case 'ready':
         bars(true); label(d.level);
-        card(`<h2>${esc(d.level.name)}</h2>${d.level.hint ? `<p>${esc(d.level.hint)}</p>` : ''}${d.level.lock ? `<p>${T.lockHint}</p>` : d.level.traps?.some(t => t.to) ? `<p>${T.moveHint}</p>` : ''}${equip(d.level, d.slots)}<p>${T.readyHold}</p><button class="go" data-do="start">${T.start}</button>`);
+        // small, so the board stays in view while the elements are chosen: a name, a line of advice, then the slots beside Start
+        card(`<h2>${esc(d.level.name)}</h2><p>${esc(d.level.hint || (d.level.lock ? T.lockHint : d.level.traps?.some(t => t.to) ? T.moveHint : T.readyHold))}</p>
+          <div class="go-row">${equip(d.level, d.slots)}<button class="go" data-do="start">${T.start}</button></div>`);
+        $('card').classList.add('compact');
         for (const b of root.querySelectorAll('[data-slot]')) b.addEventListener('click', () => h.cycleSlot(+b.dataset.slot));
         slots(d.slots, null, [0, 0]);
         break;
@@ -118,7 +121,7 @@ export function createUI(root, h) {
   // the two slots on the ready card: tap one to change what goes in it
   function equip(level, chosen) {
     if (!ownedFor(level.world).length) return '';
-    return `<p>${T.equip}</p><div class="equip">${chosen.map((el, i) => el
+    return `<div class="equip" aria-label="${T.equip}">${chosen.map((el, i) => el
       ? `<button data-slot="${i}" aria-label="칸 ${i + 1}: ${ELEMENTS[el].name}">${ICON[el]}${ELEMENTS[el].name}</button>`
       : `<button data-slot="${i}" class="empty" aria-label="칸 ${i + 1}: ${T.none}">${T.none}</button>`).join('')}</div>`;
   }

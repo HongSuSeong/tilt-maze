@@ -113,6 +113,24 @@ try {
   check(await page.evaluate(() => document.documentElement.dataset.look) === 'toon', 'the cartoon theme is bought and worn');
   await page.reload();
   check(await page.evaluate(() => document.documentElement.dataset.look) === 'toon', 'and stays after a reload');
+  // failing three times brings the rest; coins skip it; settings open from pause and close back to it
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('tilt-maze:v1')); s.coins = 30; s.theme = 'toy'; localStorage.setItem('tilt-maze:v1', JSON.stringify(s)); });
+  await page.goto(`http://localhost:${PORT}/tilt-maze/?test&unlock`);
+  await page.locator('.grid button[data-id="w1-2"]').first().click(); await page.getByRole('button', { name: '시작' }).click();
+  for (let k = 0; k < 3; k++) {
+    await page.evaluate(() => { window.__tm.run.left = 0.05; });
+    await page.getByText('시간이 다 됐어요').waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: '다시 하기' }).click();
+    if (k < 2) await page.getByRole('button', { name: '시작' }).click();
+  }
+  check(await page.getByText('잠깐 쉬어요').isVisible(), 'three fails in a row bring the rest');
+  await page.getByRole('button', { name: /코인 10개로 바로 하기/ }).click();
+  check(await page.getByRole('button', { name: '시작' }).isVisible(), 'ten coins skip it');
+  await page.getByRole('button', { name: '시작' }).click(); await page.locator('#pauseBtn').click();
+  await page.getByRole('button', { name: '설정' }).click(); await page.getByRole('button', { name: '닫기' }).click();
+  check(await page.getByRole('button', { name: '계속하기' }).isVisible(), 'settings opened from pause close back to it');
+  await page.getByRole('button', { name: '계속하기' }).click();
+  check(await page.evaluate(() => window.__tm.run.phase) === 'play', 'and play goes on');
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } finally { await browser.close(); srv.kill(); }
 console.log(ok ? 'ALL PASS' : 'FAILED'); process.exitCode = ok ? 0 : 1;

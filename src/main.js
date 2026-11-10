@@ -26,7 +26,7 @@ addEventListener('keydown', e => { keys[e.key] = true; if ((e.key === '1' || e.k
 addEventListener('keyup', e => { keys[e.key] = false; });
 addEventListener('resize', () => view.resize());
 
-// The first tap opens the sensor (iPhones ask), the sound, and keeps the mode awake while playing.
+// The first tap opens the sensor (iPhones ask), the sound, and keeps the screen awake while playing.
 async function unlock() {
   if (unlocked) return; unlocked = true; sound.unlock();
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -34,7 +34,7 @@ async function unlock() {
   }
   setTimeout(() => { if (!tilt.hasSensor && !notice) { notice = T.noSensor; if (mode === 'home') goHome(); } }, 1500);
 }
-async function stayAwake() { try { wake = await navigator.wakeLock?.request('mode'); } catch { wake = null; } }
+async function stayAwake() { try { wake = await navigator.wakeLock?.request('screen'); } catch { wake = null; } }
 
 function load(id) {
   const ls = levelsFor(save.diff), level = ls.find(l => l.id === id) || ls[0];

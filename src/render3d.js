@@ -27,7 +27,6 @@ const WORLD_TINT = {
   9: { light: { bg: '#0B0D14', floor: '#1A1D2B', dot: '#242838', ring: '#9C7BFF' }, dark: { bg: '#05060A', floor: '#14161F', dot: '#1E2130', ring: '#B49CFF' } },
   10: { light: { bg: '#FBF6EA', floor: '#F2E6C8', dot: '#E6D6AE', ring: '#E0A100' }, dark: { bg: '#15120A', floor: '#231E12', dot: '#33291A', ring: '#FFC93C' } },
 };
-const ELEMENT_COLOR = { water: '#5BB8F5', fire: '#FF7A45', ice: '#8FD8F0', spark: '#FFD23F', stone: '#9A8F86', gas: '#B8E986' };
 
 function canvasTex(w, h, paint) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
@@ -115,10 +114,7 @@ export function createView(container) {
     trail: new THREE.MeshBasicMaterial({ color: '#FF9A55', transparent: true, depthWrite: false }),
     pool: jelly('#8FD3FF', '#E1F5FF', 0.7), poolRim: new THREE.MeshStandardMaterial({ color: '#BFE7FF', roughness: 0.5 }),
     vent: new THREE.MeshStandardMaterial({ color: '#8B5A48', roughness: 0.8 }),
-    flame: new THREE.MeshStandardMaterial({ color: '#FF8A3D', emissive: '#FF5A1E', emissiveIntensity: 1.2, transparent: true, opacity: 0.92 }),
-    core: new THREE.MeshStandardMaterial({ color: '#FFE08A', emissive: '#FFC23D', emissiveIntensity: 1.4 }),
     steam: new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, depthWrite: false }),
-    coat: new THREE.MeshStandardMaterial({ color: '#5BB8F5', transparent: true, opacity: 0.35, roughness: 0.1, depthWrite: false }),
     vine: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#6FBF5A'; g.fillRect(0, 0, w, h); g.fillStyle = '#4E9A3E'; for (let i = 0; i < 40; i++) { g.beginPath(); g.ellipse((i * 53) % w, (i * 29) % h, 9, 5, i, 0, 7); g.fill(); } }), roughness: 0.8 }),
     ice: new THREE.MeshStandardMaterial({ color: '#CFEFFF', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.78 }),
     door: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#B07A4F'; g.fillRect(0, 0, w, h); g.fillStyle = '#8A5A36'; for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 4, h); }), roughness: 0.7 }),
@@ -152,7 +148,6 @@ export function createView(container) {
   const WALL_MAT = { wall: mat.wall, crack: mat.crack, vine: mat.vine, ice: mat.ice, door: mat.door, fence: mat.fence, thick: mat.thick };
   const board = new THREE.Group(); scene.add(board);
   const ball = new THREE.Mesh(new THREE.SphereGeometry(R * U, 40, 24), mat.ball); ball.castShadow = true;
-  const coat = new THREE.Mesh(new THREE.SphereGeometry(R * U * 1.28, 32, 20), mat.coat); coat.visible = false;   // the element the ball wears
   const aura = createAura();   // the element the ball wears, and the burst when it is put on
   const lamp = new THREE.PointLight('#fff2dd', 0, 5.5, 1.6); lamp.castShadow = false;   // in the dark, the ball carries the only light
   const trail = Array.from({ length: 24 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), mat.trail.clone()); m.visible = false; return { m, t: 9 }; });
@@ -265,8 +260,8 @@ export function createView(container) {
       const flame = flameShape(0.2); flame.position.y = 1.02; flame.visible = false; g.add(flame);
       board.add(g); return { g, flame };
     });
-    board.add(ball); board.add(coat); board.add(lamp); board.add(aura.group); for (const t of trail) { t.m.visible = false; board.add(t.m); }
-    ball.quaternion.identity(); ball.visible = true; ball.scale.setScalar(1); coat.visible = false;
+    board.add(ball); board.add(lamp); board.add(aura.group); for (const t of trail) { t.m.visible = false; board.add(t.m); }
+    ball.quaternion.identity(); ball.visible = true; ball.scale.setScalar(1);
     paint();
   }
   function roundRect(w, h, r) {
@@ -333,7 +328,7 @@ export function createView(container) {
     if (sp > 0.01 && b.fall === 0) { axis.set(b.vy, 0, -b.vx).normalize(); q.setFromAxisAngle(axis, sp * dt / R); ball.quaternion.premultiply(q); }
     const sink = b.fall > 0 ? Math.min(1, b.fall / 0.5) : 0;
     ball.position.set(X(b.x), R * U - sink * R * U * 2.4, Z(b.y)); ball.scale.setScalar(1 - sink * 0.3); ball.visible = b.fall < 0.9;
-    coat.visible = false; lamp.position.set(ball.position.x, 1.4, ball.position.z);
+    lamp.position.set(ball.position.x, 1.4, ball.position.z);
     ball.scale.multiplyScalar(aura.update(run, ball, dt, clock, events));   // the element's shape round the ball, and its little bounce when put on
     if (aura.wearing) ball.visible = false;   // the ball has become the element
     if (sp > FEEL.brk && b.fall === 0) { const t = trail[trailI++ % trail.length]; t.t = 0; t.m.position.copy(ball.position); t.m.visible = true; }

@@ -12,7 +12,8 @@
 }
 [hidden] { display: none !important; }
 /* the paper look: hand-lettered, square-ish cut paper with a shadow off to the side */
-:root[data-look="paper"] body, :root[data-look="paper"] button { font-family: 'Gaegu', 'Jua', sans-serif; font-weight: 700; }
+:root[data-look="paper"] h1, :root[data-look="paper"] h2, :root[data-look="paper"] .big, :root[data-look="paper"] .pill b { font-family: 'Gaegu', 'Jua', sans-serif; font-weight: 700; font-size: 1.15em; }   /* handwriting for the big words only: small text stays readable */
+:root[data-look="paper"] .home h1 { font-size: 46px; }
 :root[data-look="paper"] .pill, :root[data-look="paper"] button, :root[data-look="paper"] .card, :root[data-look="paper"] .purse, :root[data-look="paper"] .hint, :root[data-look="paper"] .toast { border-radius: 6px; box-shadow: 3px 4px 0 rgba(24, 58, 87, .28); }
 :root[data-look="paper"] button:active:not(:disabled) { box-shadow: 1px 1px 0 rgba(24, 58, 87, .28); }
 /* the cartoon look: bold letters, everything drawn with a thick dark line */
@@ -69,6 +70,13 @@ button.go:active:not(:disabled) { box-shadow: 0 2px 0 var(--go-edge); }
 .scrim.clear-bg { background: transparent; pointer-events: none; }
 .scrim.ask { align-items: center; z-index: 20; }
 .scrim.clear-bg .card { pointer-events: auto; }
+.card.compact { gap: 8px; padding: 16px 16px 14px; }
+.card.compact h2 { font-size: 22px; }
+.card.compact p { font-size: 14px; }
+.card.compact .go-row { display: flex; gap: 10px; align-items: stretch; }
+.card.compact .go-row .equip { flex: 0 0 auto; gap: 8px; }
+.card.compact .go-row .equip button { width: 64px; min-height: 56px; font-size: 12px; }
+.card.compact .go-row > .go { flex: 1; }
 .card { width: min(380px, 100%); background: var(--card); border-radius: 28px; box-shadow: 0 8px 0 var(--edge); padding: 24px 20px 20px; display: grid; gap: 14px; text-align: center; }
 .card h2 { margin: 0; font-weight: 400; font-size: 26px; text-wrap: balance; }
 .card p { margin: 0; color: var(--mute); }
