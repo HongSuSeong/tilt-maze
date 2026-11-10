@@ -133,14 +133,14 @@ export function createView(container) {
     slickRim: new THREE.MeshStandardMaterial({ color: '#BFE7F7', roughness: 0.3 }),
     deep: jelly('#2F7FB8', '#5BB8F5', 0.5), deepRim: new THREE.MeshStandardMaterial({ color: '#1E5A86', roughness: 0.6 }),
     fence: new THREE.MeshStandardMaterial({ map: canvasTex(128, 32, (g, w, h) => { g.fillStyle = '#FFD23F'; g.fillRect(0, 0, w, h); g.fillStyle = '#2B2F45'; for (let x = -32; x < w; x += 24) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 12, 0); g.lineTo(x + 24, 0); g.lineTo(x + 12, h); g.fill(); } }), emissive: '#FFB800', emissiveIntensity: 0.25, roughness: 0.5 }),
-    zap: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // rounded lemon tiles, each with a bolt
+    zap: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // rounded lemon tiles (the one big bolt sits on top)
       g.fillStyle = '#E8D88A'; g.fillRect(0, 0, w, h); g.fillStyle = '#FFE98A'; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 12); g.fill();
-      g.fillStyle = '#F2B800'; g.beginPath(); [[36, 12], [22, 34], [31, 34], [26, 52], [42, 28], [33, 28], [38, 12]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
     }), emissive: '#FFD23F', emissiveIntensity: 0.6, roughness: 0.6 }),
-    zapOff: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // the same tiles switched off: grey slate, a dull bolt
+    zapOff: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // the same tiles switched off: grey slate
       g.fillStyle = '#B7B3C4'; g.fillRect(0, 0, w, h); g.fillStyle = '#CFCCDA'; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 12); g.fill();
-      g.fillStyle = '#A29EB3'; g.beginPath(); [[36, 12], [22, 34], [31, 34], [26, 52], [42, 28], [33, 28], [38, 12]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
     }), roughness: 0.8 }),
+    boltOn: new THREE.MeshStandardMaterial({ color: '#FF9F1C', emissive: '#FF8A00', emissiveIntensity: 0.6, roughness: 0.5 }), boltOnLine: new THREE.MeshBasicMaterial({ color: '#3B4778' }),
+    boltOff: new THREE.MeshStandardMaterial({ color: '#A29EB3', roughness: 0.8 }), boltOffLine: new THREE.MeshBasicMaterial({ color: '#7E7A92' }),
     arc: new THREE.MeshBasicMaterial({ color: '#FFF27A', side: THREE.DoubleSide }),
     box: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // a round button with a bolt on it
       g.fillStyle = '#FFD23F'; g.fillRect(0, 0, w, h); g.fillStyle = '#3B4778'; g.beginPath(); [[36, 10], [20, 34], [31, 34], [25, 54], [44, 26], [33, 26], [39, 10]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
@@ -160,6 +160,7 @@ export function createView(container) {
   let theme = 'toy';
   const outlineMat = new THREE.MeshBasicMaterial({ color: '#2B1B5A', side: THREE.BackSide });
   const ballEdge = new THREE.Mesh(new THREE.SphereGeometry(R * U, 24, 16), outlineMat); ballEdge.scale.setScalar(1.14); ball.add(ballEdge);   // the cartoon look outlines the ball too
+  const boltGeo = (() => { const sh = new THREE.Shape(); [[0.05, 0.5], [-0.14, 0.02], [0.02, 0.02], [-0.06, -0.5], [0.16, 0.08], [0, 0.08], [0.12, 0.5]].forEach(([x, y], i) => (i ? sh.lineTo((x - 0.01) * 1.7, y) : sh.moveTo((x - 0.01) * 1.7, y))); return new THREE.ShapeGeometry(sh); })();
   const arcGeo = (() => { const sh = new THREE.Shape(); [[0.05, 0.5], [-0.14, 0.02], [0.02, 0.02], [-0.06, -0.5], [0.16, 0.08], [0, 0.08], [0.12, 0.5]].forEach(([x, y], i) => (i ? sh.lineTo(x * 0.8, (y + 0.5) * 0.8) : sh.moveTo(x * 0.8, (y + 0.5) * 0.8))); return new THREE.ShapeGeometry(sh); })();
   let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], pools = [], zaps = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
@@ -233,7 +234,13 @@ export function createView(container) {
     deeps = (lv.deep || []).map(r => flat(r, mat.deep, 0.009, mat.deepRim));
     zaps = (lv.zaps || []).map(z => {   // the floor lit and the floor off, one shown at a time, and little bolts that jump about while it is on
       const sparks = new THREE.Group(); for (let k = 0; k < Math.max(3, Math.round(z.w * z.h / 120)); k++) sparks.add(new THREE.Mesh(arcGeo, mat.arc));
-      board.add(sparks); return { z, on: flat(z, mat.zap, 0.007), off: flat(z, mat.zapOff, 0.007), sparks, t: 0 };
+      const bolt = (body, line) => {   // one big bolt lying in the middle of the patch, with a dark edge round it
+        const g = new THREE.Group(), k = Math.min(z.w, z.h) * U * 0.7; g.position.set(X(z.x + z.w / 2), 0.012, Z(z.y + z.h / 2)); g.rotation.x = -Math.PI / 2;
+        const edge = new THREE.Mesh(boltGeo, line); edge.scale.setScalar(k * 1.14); const top = new THREE.Mesh(boltGeo, body); top.scale.setScalar(k); top.position.z = 0.003;
+        g.add(edge, top); board.add(g); return g;
+      };
+      board.add(sparks);
+      return { z, on: flat(z, mat.zap, 0.007), off: flat(z, mat.zapOff, 0.007), boltOn: bolt(mat.boltOn, mat.boltOnLine), boltOff: bolt(mat.boltOff, mat.boltOffLine), sparks, t: 0 };
     });
     for (const g of lv.gaps || []) flat(g, mat.gap, 0.011, mat.gapRim);
     winds = (lv.winds || []).map(a => {   // stripes that run the way the wind blows
@@ -329,8 +336,9 @@ export function createView(container) {
     switches.forEach((b, i) => { b.material.emissiveIntensity = run.state.powered?.has(i) ? 1.2 : 0; });
     // the electric floor: on for two seconds (lit, bolts jumping), off for two (grey); flickering just before it comes on
     const ph = (run.state.clock || 0) % 4, zapOn = ph < 2, warn = ph > 3.4 && Math.sin(clock * 38) > 0;
+    mat.boltOn.emissiveIntensity = zapOn ? 0.35 + 0.25 * Math.sin(clock * 30) : 0.1;
     for (const p of zaps) {
-      p.on.visible = zapOn || warn; p.off.visible = !p.on.visible; p.sparks.visible = zapOn;
+      p.on.visible = p.boltOn.visible = zapOn || warn; p.off.visible = p.boltOff.visible = !p.on.visible; p.sparks.visible = zapOn;
       p.on.material.emissiveIntensity = zapOn ? 0.45 + 0.2 * Math.sin(clock * 30) : 0.15;
       if (zapOn && (p.t -= dt) <= 0) {
         p.t = 0.08;
