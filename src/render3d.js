@@ -24,7 +24,7 @@ const WORLD_TINT = {
   6: { light: { bg: '#F4F1EC', floor: '#E6DFD5', dot: '#D6CDC0', ring: '#9A8F86' }, dark: { bg: '#141210', floor: '#221E1A', dot: '#322C26', ring: '#C9BEB3' } },
   7: { light: { bg: '#EEF8F3', floor: '#DDF2E8', dot: '#C6E7D8', ring: '#9CD66A' }, dark: { bg: '#0E1712', floor: '#16241D', dot: '#22352B', ring: '#B8E986' } },
   8: { light: { bg: '#F5F2FB', floor: '#E7E0F5', dot: '#D6CCEB', ring: '#9C7BFF' }, dark: { bg: '#110F18', floor: '#1C1928', dot: '#2A2538', ring: '#B49CFF' } },
-  9: { light: { bg: '#0B0D14', floor: '#1A1D2B', dot: '#242838', ring: '#9C7BFF' }, dark: { bg: '#05060A', floor: '#14161F', dot: '#1E2130', ring: '#B49CFF' } },
+  9: { light: { bg: '#050609', floor: '#141722', dot: '#1C2030', ring: '#B49CFF', wall: '#8E93A8' }, dark: { bg: '#030405', floor: '#10121A', dot: '#181B26', ring: '#B49CFF', wall: '#6E7388' } },
   10: { light: { bg: '#FBF6EA', floor: '#F2E6C8', dot: '#E6D6AE', ring: '#E0A100' }, dark: { bg: '#15120A', floor: '#231E12', dot: '#33291A', ring: '#FFC93C' } },
 };
 
@@ -167,7 +167,8 @@ export function createView(container) {
     mat.wall.color.set(p.wall); mat.base.color.set(p.base); mat.hole.color.set(p.hole); mat.lip.color.set(p.lip); mat.ring.color.set(p.ring); mat.trap.color.set(p.trap);
     mat.coin.emissiveIntensity = p.glow;
     hemi.color.set(p.hemi[0]); hemi.groundColor.set(p.hemi[1]); hemi.intensity = p.hemi[2]; sun.intensity = p.sun;
-    if (level?.dim) { hemi.intensity = 0.05; sun.intensity = 0.03; lamp.intensity = 5; } else lamp.intensity = 0;
+    // the dark: almost no light but the ball's own; what matters (holes, traps, coins, lava, fences) glows by itself
+    if (level?.dim) { hemi.intensity = 0.012; sun.intensity = 0; lamp.intensity = 7; lamp.distance = 3.6; mat.coin.emissiveIntensity = 1.1; } else lamp.intensity = 0;
   }
 
   function block(w, m) {
