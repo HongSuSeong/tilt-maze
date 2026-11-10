@@ -7,6 +7,16 @@ const B = 3, WALL = 3;   // the rim, and the walls between cells
 const NAMES = { 1: '들판', 2: '물가', 3: '불의 협곡', 4: '얼음 들판', 5: '번개 공장', 6: '돌 채석장', 7: '바람 절벽', 8: '갈림길', 9: '어둠', 10: '원소의 끝' };
 const PAIRS = [['water', 'fire'], ['ice', 'spark'], ['stone', 'gas'], ['fire', 'ice'], ['water', 'spark'], ['gas', 'fire'], ['stone', 'water'], ['spark', 'gas'], ['ice', 'stone'], ['fire', 'spark']];
 
+// Stages of the mixed worlds (easy, and normal from it) that need two elements mixed: a fusion (steam, snowball,
+// blast) or a puddle trick (ice freezes it so stone can cross; electricity runs through it to a switch). Each brings
+// its own kit and one device on the way that only the mix gets past.
+const COMBO = { 8: { 3: 'steam', 5: 'freeze', 6: 'snow', 8: 'wire', 9: 'blast' }, 9: { 2: 'snow', 4: 'wire', 5: 'blast', 7: 'freeze', 8: 'steam' }, 10: { 2: 'blast', 3: 'freeze', 5: 'steam', 7: 'wire', 9: 'snow' } };
+const COMBO_KIT = { steam: ['water', 'fire'], snow: ['water', 'ice'], blast: ['fire', 'gas'], freeze: ['ice', 'stone'], wire: ['water', 'spark'] };
+const COMBO_HINT = {
+  steam: '원소를 두른 채 다른 칸을 누르면 두 원소가 합체해요. 칸이 반짝이면 합칠 수 있어요',
+  freeze: '돌은 웅덩이에 가라앉아요. 얼음은 웅덩이도 얼려요', wire: '전기는 물을 타고 흘러요',
+};
+
 function rng(seed) {   // mulberry32
   return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
@@ -63,14 +73,15 @@ export function generate(world, index, diff = 'hard') {
   };
   const floor = c => ({ x: B + col(c) * cw + WALL / 2, y: B + row(c) * ch + WALL / 2, w: cw - WALL, h: ch - WALL });
 
-  const kit = kitFor(world, index), o = { fires: [], lava: [], deep: [], gaps: [], torches: [], switches: [], zaps: [], winds: [], slick: [], enemies: [] };
-  // devices along the way, spread out: two for a single element, one or two for each of a pair
-  const each = kit.length === 1 ? 2 : world >= 10 ? 2 : 1, total = each * kit.length, L = path.length, used = new Set();
+  const combo = diff === 'easy' ? COMBO[world]?.[index] ?? null : null, kit = combo ? COMBO_KIT[combo] : kitFor(world, index);
+  const o = { fires: [], lava: [], deep: [], gaps: [], torches: [], switches: [], zaps: [], winds: [], slick: [], enemies: [], ...(combo && { pools: [] }) };
+  // devices along the way, spread out: two for a single element, one or two for each of a pair, and the mix's last
+  const each = kit.length === 1 ? 2 : world >= 10 ? 2 : 1, total = each * kit.length + (combo ? 1 : 0), L = path.length, used = new Set();
   const slots = Array.from({ length: total }, (_, k) => Math.max(1, Math.min(L - 3, Math.round((L - 2) * (k + 1) / (total + 1)))));
   slots.forEach((at, k) => {
     while (used.has(at) || used.has(at + 1) || used.has(at - 1)) at = at + 1 < L - 2 ? at + 1 : 1;   // apart, and off the start and the hole
     used.add(at);
-    const el = kit[Math.floor(k / each)], c = path[at], next = path[at + 1], prev = path[at - 1];
+    const el = combo && k === total - 1 ? combo : kit[Math.floor(k / each)], c = path[at], next = path[at + 1], prev = path[at - 1];
     if (el === 'water') { if (kit.includes('gas') || rand() < 0.4) o.lava.push(floor(c)); else o.fires.push({ ...center(c), r: Math.max(6, Math.min(cw, ch) / 2 - 3) }); }   // a pillar as wide as its cell, so there is no way round it
     if (el === 'fire') {
       const how = kit.includes('gas') ? rand() * 0.6 : rand();   // with gas about, no torch: a blast beside it would open the door without fire
@@ -82,6 +93,15 @@ export function generate(world, index, diff = 'hard') {
     if (el === 'spark') { o.switches.push({ ...center(prev), open: [walls.length] }); walls.push(plug(c, next, E)); }
     if (el === 'stone') walls.push(plug(c, next, T));
     if (el === 'gas') o.gaps.push(floor(c));
+    if (el === 'steam') o.deep.push(floor(c));                        // only steam floats over it (no ice here)
+    if (el === 'snow' || el === 'blast') walls.push(plug(c, next, T));   // no stone here: only the fusion breaks it
+    if (el === 'freeze') { o.pools.push(floor(c)); walls.push(plug(c, next, T)); }   // stone would sink before the wall
+    if (el === 'wire') {   // a fence, and its switch just past it where the puddle reaches under the fence
+      const a = center(c), b = center(next), dx = Math.sign(b.x - a.x), dy = Math.sign(b.y - a.y), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, f = floor(c);
+      const x0 = dx < 0 ? m.x - 8 : f.x, x1 = dx > 0 ? m.x + 8 : f.x + f.w, y0 = dy < 0 ? m.y - 8 : f.y, y1 = dy > 0 ? m.y + 8 : f.y + f.h;
+      o.pools.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+      o.switches.push({ x: m.x + dx * 6, y: m.y + dy * 6, open: [walls.length] }); walls.push(plug(c, next, E));
+    }
   });
   // what each world adds along the rest of the way
   const free = path.filter((c, k) => k > 0 && k < L - 1 && !used.has(k) && !used.has(k - 1));
@@ -127,14 +147,15 @@ export function generate(world, index, diff = 'hard') {
     if (extra === 0) for (const c of cells.slice(0, 2)) { const n = path[path.indexOf(c) + 1], a = center(c), b = center(n); o.winds.push({ ...floor(c), dx: Math.sign(b.x - a.x) * 140, dy: Math.sign(b.y - a.y) * 140 }); }
     if (extra === 1) o.zaps.push(...cells.slice(0, 2).map(floor));
     if (extra === 2) o.slick.push(...cells.map(floor));
-    if (extra === 3 && !kit.includes('stone')) o.pools = cells.slice(0, 2).map(floor);
+    if (extra === 3 && !kit.includes('stone')) o.pools = [...(o.pools || []), ...cells.slice(0, 2).map(floor)];
     const foes = world === 10 ? (index >= 8 ? 2 : index >= 3 ? 1 : 0) : world === 9 && index >= 6 ? 1 : 0;
     const lair = deadEnds.filter(c => !trapCells.includes(c)).concat(deadEnds);
     o.enemies.push(...lair.slice(0, foes).map(c => ({ ...center(c), speed: 20 })));
-    const hint = { 8: '이제 원소가 여섯 가지예요. 판을 보고 맞는 두 가지를 장착하세요', 9: '어둠 속에서는 공 둘레만 보여요. 빛나는 것을 길잡이 삼아 가세요' }[world];
+    const hint = index === 1 ? { 8: '이제 원소가 여섯 가지예요. 판을 보고 맞는 두 가지를 장착하세요', 9: '어둠 속에서는 공 둘레만 보여요. 빛나는 것을 길잡이 삼아 가세요' }[world]
+      : world === 8 && COMBO_HINT[combo];
     return {
       id: `w${world}-${index}`, world, index, name: `${NAMES[world]} ${index}`, kit, path: L, start: center(0), hole: { ...center(end), r: 7.4 }, walls, coins, traps: [],
-      time: Math.max(30, Math.min(110, Math.round(L * 3.2 + total * 3 + 12))), normal: { traps }, ...o, ...(world === 9 && { dim: true }), ...(index === 1 && hint && { hint }),
+      time: Math.max(30, Math.min(110, Math.round(L * 3.2 + total * 3 + 12 + (combo ? 6 : 0)))), normal: { traps }, ...o, ...(world === 9 && { dim: true }), ...(hint && { hint }), ...(combo && { combo }),
     };
   }
   return {
