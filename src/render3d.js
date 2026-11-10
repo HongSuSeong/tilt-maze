@@ -137,6 +137,11 @@ export function createView(container) {
       g.fillStyle = '#E8D88A'; g.fillRect(0, 0, w, h); g.fillStyle = '#FFE98A'; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 12); g.fill();
       g.fillStyle = '#F2B800'; g.beginPath(); [[36, 12], [22, 34], [31, 34], [26, 52], [42, 28], [33, 28], [38, 12]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
     }), emissive: '#FFD23F', emissiveIntensity: 0.6, roughness: 0.6 }),
+    zapOff: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // the same tiles switched off: grey slate, a dull bolt
+      g.fillStyle = '#B7B3C4'; g.fillRect(0, 0, w, h); g.fillStyle = '#CFCCDA'; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 12); g.fill();
+      g.fillStyle = '#A29EB3'; g.beginPath(); [[36, 12], [22, 34], [31, 34], [26, 52], [42, 28], [33, 28], [38, 12]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
+    }), roughness: 0.8 }),
+    arc: new THREE.MeshBasicMaterial({ color: '#FFF27A', side: THREE.DoubleSide }),
     box: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // a round button with a bolt on it
       g.fillStyle = '#FFD23F'; g.fillRect(0, 0, w, h); g.fillStyle = '#3B4778'; g.beginPath(); [[36, 10], [20, 34], [31, 34], [25, 54], [44, 26], [33, 26], [39, 10]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
     }), emissive: '#FFB800', emissiveIntensity: 0 }),
@@ -155,7 +160,8 @@ export function createView(container) {
   let theme = 'toy';
   const outlineMat = new THREE.MeshBasicMaterial({ color: '#2B1B5A', side: THREE.BackSide });
   const ballEdge = new THREE.Mesh(new THREE.SphereGeometry(R * U, 24, 16), outlineMat); ballEdge.scale.setScalar(1.14); ball.add(ballEdge);   // the cartoon look outlines the ball too
-  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], pools = [], zapMats = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
+  const arcGeo = (() => { const sh = new THREE.Shape(); [[0.05, 0.5], [-0.14, 0.02], [0.02, 0.02], [-0.06, -0.5], [0.16, 0.08], [0, 0.08], [0.12, 0.5]].forEach(([x, y], i) => (i ? sh.lineTo(x * 0.8, (y + 0.5) * 0.8) : sh.moveTo(x * 0.8, (y + 0.5) * 0.8))); return new THREE.ShapeGeometry(sh); })();
+  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], pools = [], zaps = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
 
   function paint() {
@@ -222,10 +228,13 @@ export function createView(container) {
       const flame = flameShape(f.r * U * 1.25); flame.position.y = 0.12; g.add(flame);   // tall enough to read from above
       board.add(g); return { g, flame, core: flame, f };
     });
-    zapMats = [];
+    zaps = [];
     for (const r of lv.slick || []) flat(r, mat.slick, 0.006, mat.slickRim);
     deeps = (lv.deep || []).map(r => flat(r, mat.deep, 0.009, mat.deepRim));
-    for (const z of lv.zaps || []) zapMats.push(flat(z, mat.zap, 0.007).material);
+    zaps = (lv.zaps || []).map(z => {   // the floor lit and the floor off, one shown at a time, and little bolts that jump about while it is on
+      const sparks = new THREE.Group(); for (let k = 0; k < Math.max(3, Math.round(z.w * z.h / 120)); k++) sparks.add(new THREE.Mesh(arcGeo, mat.arc));
+      board.add(sparks); return { z, on: flat(z, mat.zap, 0.007), off: flat(z, mat.zapOff, 0.007), sparks, t: 0 };
+    });
     for (const g of lv.gaps || []) flat(g, mat.gap, 0.011, mat.gapRim);
     winds = (lv.winds || []).map(a => {   // stripes that run the way the wind blows
       const t = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 5; for (let y = 8; y < h; y += 21) { g.beginPath(); g.moveTo(8, y); g.lineTo(40, y); g.lineTo(32, y - 6); g.moveTo(40, y); g.lineTo(32, y + 6); g.stroke(); } });
@@ -288,6 +297,7 @@ export function createView(container) {
 
   function update(run, tilt, dt, events = []) {
     clock += dt;
+    if (`${innerWidth}x${innerHeight}` !== sized) resize();
     const b = run.ball, k = FEEL.lean * Math.PI / 180;
     board.rotation.x += (tilt.y * k - board.rotation.x) * 0.35; board.rotation.z += (-tilt.x * k - board.rotation.z) * 0.35;
     for (const e of events) {
@@ -317,7 +327,16 @@ export function createView(container) {
     deeps.forEach((m, i) => { m.material = run.state.frozen?.has(i) ? mat.slick : mat.deep; });
     pools.forEach((m, i) => { m.material = run.state.iced?.has(i) ? mat.slick : mat.pool; });   // a frozen puddle is ice
     switches.forEach((b, i) => { b.material.emissiveIntensity = run.state.powered?.has(i) ? 1.2 : 0; });
-    const zapOn = (run.state.clock || 0) % 4 < 2; for (const m of zapMats) m.emissiveIntensity = zapOn ? 0.22 + 0.12 * Math.sin(clock * 30) : 0;   // on for two seconds, off for two
+    // the electric floor: on for two seconds (lit, bolts jumping), off for two (grey); flickering just before it comes on
+    const ph = (run.state.clock || 0) % 4, zapOn = ph < 2, warn = ph > 3.4 && Math.sin(clock * 38) > 0;
+    for (const p of zaps) {
+      p.on.visible = zapOn || warn; p.off.visible = !p.on.visible; p.sparks.visible = zapOn;
+      p.on.material.emissiveIntensity = zapOn ? 0.45 + 0.2 * Math.sin(clock * 30) : 0.15;
+      if (zapOn && (p.t -= dt) <= 0) {
+        p.t = 0.08;
+        for (const b of p.sparks.children) { b.position.set(X(p.z.x + 2 + Math.random() * (p.z.w - 4)), 0.01, Z(p.z.y + 2 + Math.random() * (p.z.h - 4))); b.rotation.y = Math.random() * Math.PI; b.scale.setScalar(0.7 + Math.random() * 0.6); }
+      }
+    }
     foes.forEach((g, i) => { const f = run.state.foes?.[i] || level.enemies[i]; g.position.set(X(f.x), 0.36 + 0.05 * Math.sin(clock * 6 + i), Z(f.y)); g.lookAt(ball.position.x, g.position.y, ball.position.z); });
     torches.forEach((t, i) => { t.flame.visible = !!run.state.lit?.has(i); t.flame.scale.set(1, 1 + 0.15 * Math.sin(clock * 11 + i), 1); });
     for (const w of winds) { const sp = Math.hypot(w.a.dx, w.a.dy) / 600 * dt; w.t.offset.x -= sp; }   // the stripes drift with the wind
@@ -351,8 +370,11 @@ export function createView(container) {
     renderer.render(scene, camera);
   }
 
+  // The board fills the window. Some in-app browsers open small and grow without a resize event, so the size is also
+  // looked at every frame (see update).
+  let sized = '';
   function resize() {
-    const w = container.clientWidth || innerWidth, h = container.clientHeight || innerHeight;
+    const w = innerWidth || container.clientWidth, h = innerHeight || container.clientHeight; sized = `${w}x${h}`;
     renderer.setSize(w, h); camera.aspect = w / h;
     // fit the board (and a little margin) between the bars at the top and bottom
     const a = VIEW_DEG * Math.PI / 180, share = Math.max(0.3, (h - BAR_TOP - BAR_BOTTOM) / h), f = Math.tan(camera.fov * Math.PI / 360);

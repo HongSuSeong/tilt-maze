@@ -153,6 +153,13 @@ try {
   await page.locator('#pauseBtn').click(); await page.getByRole('button', { name: '처음 화면으로' }).click();
   await page.getByRole('button', { name: /꾸미기/ }).click(); await page.getByRole('tab', { name: '도감' }).click();
   check(await page.locator('.fusion:not(.unknown)').count() === 1 && await page.locator('.fusion.unknown').count() === 2, 'the book shows steam and two still to find');
+  // an in-app browser can open small and grow without telling the page (no resize event): the board must still fill it
+  const quiet = await browser.newPage({ viewport: { width: 390, height: 300 } });
+  await quiet.addInitScript(() => addEventListener('resize', e => e.stopImmediatePropagation()));
+  await quiet.goto(`http://localhost:${PORT}/tilt-maze/?test`); await quiet.waitForTimeout(500);
+  await quiet.setViewportSize({ width: 390, height: 844 }); await quiet.waitForTimeout(500);
+  check(await quiet.evaluate(() => document.querySelector('body > canvas').clientHeight) === 844, 'the board grows with the screen even when no resize is told');
+  await quiet.close();
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } finally { await browser.close(); srv.kill(); }
 console.log(ok ? 'ALL PASS' : 'FAILED'); process.exitCode = ok ? 0 : 1;
