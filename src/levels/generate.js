@@ -20,11 +20,14 @@ function kitFor(world, index) {
 }
 
 // hard, hell and god differ in the grid, the seed, the id, and what they add (moving traps; a hole locked behind the coins)
-const KINDS = { hard: { C: 5, rows: w => (w <= 5 ? 8 : 9), id: 'h', salt: 0 }, hell: { C: 6, rows: () => 9, id: 'x', salt: 1 }, god: { C: 6, rows: () => 10, id: 'g', salt: 2 } };
+// easy is for the mixed worlds (8–10) of the stages drawn by hand: wide cells, a size that grows through the world
+const EASY_SIZE = (w, i) => (w === 10 ? [4 + (i > 6), 5 + Math.floor(i / 4)] : [3 + (i > 5), (w === 8 ? 4 : 5) + Math.floor(i / 4)]);
+const KINDS = { easy: { id: 'w', salt: 3 }, hard: { C: 5, rows: w => (w <= 5 ? 8 : 9), id: 'h', salt: 0 }, hell: { C: 6, rows: () => 9, id: 'x', salt: 1 }, god: { C: 6, rows: () => 10, id: 'g', salt: 2 } };
 
 export function generate(world, index, diff = 'hard') {
   const K = KINDS[diff], rand = rng(world * 7919 + index * 104729 + 17 + K.salt * 7777777), pick = a => a[Math.floor(rand() * a.length)];
-  const C = K.C, Rn = K.rows(world), cw = (100 - 2 * B) / C, ch = (160 - 2 * B) / Rn, N = C * Rn;
+  const [C, Rn] = diff === 'easy' ? EASY_SIZE(world, index) : [K.C, K.rows(world)];
+  const cw = (100 - 2 * B) / C, ch = (160 - 2 * B) / Rn, N = C * Rn;
   const col = c => c % C, row = c => Math.floor(c / C);
   const center = c => ({ x: B + (col(c) + 0.5) * cw, y: B + (row(c) + 0.5) * ch });
   const neighbours = c => [c - C, c + C, col(c) > 0 ? c - 1 : -1, col(c) < C - 1 ? c + 1 : -1].filter(n => n >= 0 && n < N);
@@ -68,7 +71,7 @@ export function generate(world, index, diff = 'hard') {
     while (used.has(at) || used.has(at + 1) || used.has(at - 1)) at = at + 1 < L - 2 ? at + 1 : 1;   // apart, and off the start and the hole
     used.add(at);
     const el = kit[Math.floor(k / each)], c = path[at], next = path[at + 1], prev = path[at - 1];
-    if (el === 'water') { if (kit.includes('gas') || rand() < 0.4) o.lava.push(floor(c)); else o.fires.push({ ...center(c), r: 6 }); }
+    if (el === 'water') { if (kit.includes('gas') || rand() < 0.4) o.lava.push(floor(c)); else o.fires.push({ ...center(c), r: Math.max(6, Math.min(cw, ch) / 2 - 3) }); }   // a pillar as wide as its cell, so there is no way round it
     if (el === 'fire') {
       const how = kit.includes('gas') ? rand() * 0.6 : rand();   // with gas about, no torch: a blast beside it would open the door without fire
       if (how < 0.4) walls.push(plug(c, next, V));
@@ -94,7 +97,7 @@ export function generate(world, index, diff = 'hard') {
   const nTraps = Math.min(deadEnds.length, 2 + Math.floor(world / 2)), trapCells = deadEnds.slice(0, nTraps);
   const traps = trapCells.map(c => ({ ...center(c), r: 4.5 }));
   if (!traps.length) { const c = [...Array(N).keys()].find(c => !onPath.has(c)) ?? path[1]; traps.push({ ...center(c), r: 4.5 }); trapCells.push(c); }
-  if (world === 5 || world === 10) {
+  if (diff !== 'easy' && (world === 5 || world === 10)) {
     const lair = deadEnds.filter(c => !trapCells.includes(c)).concat([path[Math.floor(L * 0.75)]]);
     o.enemies.push(...lair.slice(0, world === 10 ? 2 : 1).map(c => ({ ...center(c), speed: 22 })));
   }
@@ -119,6 +122,21 @@ export function generate(world, index, diff = 'hard') {
     }
   }
 
+  if (diff === 'easy') {   // each stage of a mixed world gets its own extra: wind, the electric floor, ice or puddles, in turn; enemies late on
+    const extra = index % 4, cells = some(3);
+    if (extra === 0) for (const c of cells.slice(0, 2)) { const n = path[path.indexOf(c) + 1], a = center(c), b = center(n); o.winds.push({ ...floor(c), dx: Math.sign(b.x - a.x) * 140, dy: Math.sign(b.y - a.y) * 140 }); }
+    if (extra === 1) o.zaps.push(...cells.slice(0, 2).map(floor));
+    if (extra === 2) o.slick.push(...cells.map(floor));
+    if (extra === 3 && !kit.includes('stone')) o.pools = cells.slice(0, 2).map(floor);
+    const foes = world === 10 ? (index >= 8 ? 2 : index >= 3 ? 1 : 0) : world === 9 && index >= 6 ? 1 : 0;
+    const lair = deadEnds.filter(c => !trapCells.includes(c)).concat(deadEnds);
+    o.enemies.push(...lair.slice(0, foes).map(c => ({ ...center(c), speed: 20 })));
+    const hint = { 8: '이제 원소가 여섯 가지예요. 판을 보고 맞는 두 가지를 장착하세요', 9: '어둠 속에서는 공 둘레만 보여요. 빛나는 것을 길잡이 삼아 가세요' }[world];
+    return {
+      id: `w${world}-${index}`, world, index, name: `${NAMES[world]} ${index}`, kit, path: L, start: center(0), hole: { ...center(end), r: 7.4 }, walls, coins, traps: [],
+      time: Math.max(30, Math.min(110, Math.round(L * 3.2 + total * 3 + 12))), normal: { traps }, ...o, ...(world === 9 && { dim: true }), ...(index === 1 && hint && { hint }),
+    };
+  }
   return {
     id: `${K.id}${world}-${index}`, world, index, name: `${NAMES[world]} ${index}`, kit, path: L,
     time: Math.max(20, Math.min(120, Math.round((L * 2.4 + total * 2 + 8) * (diff === 'hard' ? 1 : 0.85) + (diff === 'god' ? coins.length * 4 : 0)))),
@@ -129,3 +147,6 @@ export function generate(world, index, diff = 'hard') {
 
 const MADE = {};
 export const madeLevels = diff => (MADE[diff] ??= Array.from({ length: 10 }, (_, w) => Array.from({ length: 10 }, (_, i) => generate(w + 1, i + 1, diff))).flat());
+
+// the mixed worlds of the stages drawn by hand (easy, and normal from them): made here, each stage a maze of its own
+export const mixedWorld = world => Array.from({ length: 10 }, (_, i) => generate(world, i + 1, 'easy'));
