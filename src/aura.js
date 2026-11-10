@@ -70,9 +70,30 @@ function build(el) {
   g.visible = false; return g;
 }
 
+// Each form sits in a rig so it can move like something rolling while it stays upright: turned to face where it
+// goes (yaw), leaning into it (tilt), stretched with speed and squashed by a knock (also tilt), hopping as it goes.
+// Ice and stone are hard things, and simply roll.
+const ROLLS = new Set(['ice', 'stone']);
+const TRAIL = {   // what a form leaves behind: colour, size, how it moves (up, gravity), how long it lasts
+  fire: { c: '#FF9A3D', s: 0.12, up: 1.6, g: 0, life: 0.55, grow: 0.5 }, water: { c: '#7CCBF5', s: 0.1, up: 1.6, g: 9, life: 0.5 },
+  ice: { c: '#FFFFFF', s: 0.08, up: 0.6, g: 0, life: 0.6 }, spark: { c: '#FFE35C', s: 0.08, up: 1.0, g: 0, life: 0.3, jitter: 4 },
+  stone: { c: '#B8ADA3', s: 0.1, up: 0.3, g: 0, life: 0.6, grow: 2.5 }, gas: { c: '#DDF5C4', s: 0.12, up: 0.5, g: 0, life: 0.8, grow: 2 },
+};
+
 export function createAura() {
-  const group = new THREE.Group(), forms = {}, bursts = [];
-  for (const el of Object.keys(COLOR)) { forms[el] = build(el); group.add(forms[el]); }
+  const group = new THREE.Group(), forms = {}, rigs = {}, bursts = [], trail = [];
+  for (const el of Object.keys(COLOR)) {
+    forms[el] = build(el); forms[el].visible = true;
+    const wrap = new THREE.Group(), yaw = new THREE.Group(), tilt = new THREE.Group();
+    wrap.add(yaw); yaw.add(tilt); tilt.add(forms[el]); wrap.visible = false; group.add(wrap); rigs[el] = { wrap, yaw, tilt };
+  }
+  const motion = { lean: 0, yaw: 0, squash: 0, hop: 0, gone: 0 };
+  const dotGeo = new THREE.SphereGeometry(1, 8, 6);
+  function drop(el, at) {   // one bit of trail
+    const T = TRAIL[el], m = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: T.c, transparent: true, depthWrite: false }));
+    m.scale.setScalar(T.s); m.position.set(at.x + (Math.random() - 0.5) * 0.3, at.y - r * 0.4 + Math.random() * 0.3, at.z + (Math.random() - 0.5) * 0.3);
+    group.add(m); trail.push({ m, t: 0, T, v: new THREE.Vector3((Math.random() - 0.5) * 0.6, T.up * (0.5 + Math.random() * 0.5), (Math.random() - 0.5) * 0.6) });
+  }
   let pop = 0;   // seconds since the last press, for the ball's little bounce
 
   function burst(el, at) {   // a ring that spreads and bits that fly, in the element's colour
@@ -87,19 +108,36 @@ export function createAura() {
   }
 
   // follow the ball; the shapes stay upright (they do not roll), turn and flicker; blink as the coat wears off
-  function update(run, ball, dt, clock) {
+  function update(run, ball, dt, clock, events = []) {
     pop += dt;
     const el = run.coat?.el, show = !!el && ball.visible && !(run.coat.left < 1.5 && Math.sin(clock * 18) < 0);   // near the end, form and ball take turns
-    for (const [k, f] of Object.entries(forms)) f.visible = show && k === el;
+    for (const [k, R0] of Object.entries(rigs)) R0.wrap.visible = show && k === el;
     api.wearing = show;
     if (el) {
-      const f = forms[el]; f.position.copy(ball.position);
+      const f = forms[el], { wrap, yaw, tilt } = rigs[el], b = run.ball, sp = Math.hypot(b.vx, b.vy);
+      for (const e of events) if (e.type === 'knock' && e.speed > 60) motion.squash = Math.min(1, e.speed / 400);   // a knock squashes it
+      motion.squash = Math.max(0, motion.squash - dt * 4);
+      wrap.position.copy(ball.position);
+      if (ROLLS.has(el)) { yaw.rotation.y = 0; tilt.rotation.x = 0; tilt.scale.setScalar(1); f.quaternion.copy(ball.quaternion); }   // hard things roll
+      else {
+        if (sp > 15) { const want = Math.atan2(b.vx, b.vy); motion.yaw += Math.atan2(Math.sin(want - motion.yaw), Math.cos(want - motion.yaw)) * Math.min(1, dt * 10); }   // face the way it goes
+        motion.lean += (Math.min(1, sp / 600) * 0.45 - motion.lean) * Math.min(1, dt * 8);                                               // lean into it, more the faster
+        const k = 1 + Math.min(0.28, sp / 1400), q = motion.squash * 0.35;                                                                 // stretched by speed, squashed by a knock
+        yaw.rotation.y = motion.yaw; tilt.rotation.x = motion.lean; tilt.scale.set((1 + q) / Math.sqrt(k), (1 - q) / Math.sqrt(k), k * (1 + q * 0.5));
+        motion.hop += sp * dt / (r * 10 * 2.2); wrap.position.y += Math.abs(Math.sin(motion.hop * Math.PI)) * Math.min(0.14, sp / 3500);   // little hops as it goes
+      }
+      motion.gone += sp * dt;
+      while (motion.gone > 9) { motion.gone -= 9; drop(el, ball.position); }   // a bit of trail every 9 units of travel
       if (el === 'fire') { const k = 1 + 0.1 * Math.sin(clock * 13); f.scale.set(1 / Math.sqrt(k), k, 1 / Math.sqrt(k)); }   // it flickers
       if (el === 'water') { const k = 1 + 0.05 * Math.sin(clock * 6); f.scale.set(k, 1 / k, k); }   // it wobbles
-      if (el === 'ice') f.rotation.y += dt * 0.8;
       if (el === 'spark') { f.rotation.y += dt * 5; f.children.forEach((c, i) => { if (i) c.visible = Math.sin(clock * 30 + i * 2) > -0.5; }); }
-      if (el === 'stone') f.quaternion.copy(ball.quaternion);   // a rock rolls
       if (el === 'gas') { const k = 1 + 0.06 * Math.sin(clock * 4); f.scale.setScalar(k); f.children.at(-1).rotation.y += dt * 2.2; f.children.at(-1).children.forEach((w, i) => { w.position.y = r * (0.1 * (i % 4) - 0.1) + 0.06 * Math.sin(clock * 3 + i); }); }
+    }
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const p = trail[i], T = p.T; p.t += dt;
+      p.v.y -= T.g * dt; if (T.jitter) p.v.x += (Math.random() - 0.5) * T.jitter;
+      p.m.position.addScaledVector(p.v, dt); p.m.scale.setScalar(T.s * (1 + (T.grow || 0) * p.t / T.life)); p.m.material.opacity = Math.max(0, 0.85 * (1 - p.t / T.life));
+      if (p.t > T.life) { group.remove(p.m); p.m.material.dispose(); trail.splice(i, 1); }
     }
     for (let i = bursts.length - 1; i >= 0; i--) {
       const b = bursts[i]; b.t += dt;
