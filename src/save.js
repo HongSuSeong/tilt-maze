@@ -8,13 +8,19 @@ const KEY = 'tilt-maze:v1', V = 2;
 const startOf = diff => levelsFor(diff)[0]?.id ?? null;
 const progFresh = () => Object.fromEntries(BUILT.map(d => [d, { best: {}, reached: startOf(d) }]));
 
-export const defaultSave = () => ({ v: V, coins: 0, diff: 'easy', prog: progFresh(), opened: ['easy'], opt: { sens: 1, snd: true, vib: true, dark: false } });
+// the ball's look, what has been bought, and how far elements are boosted: added after version 2 began, so a save
+// without them takes these
+const extras = () => ({
+  look: { mode: 'pattern', pattern: 'dots', base: 'coral', accent: 'cream', pixels: Array(128).fill(null) },
+  owned: { patterns: ['dots', 'stripes'], colors: ['coral', 'mint', 'cream'] }, boost: 0,
+});
+export const defaultSave = () => ({ v: V, coins: 0, diff: 'easy', prog: progFresh(), opened: ['easy'], opt: { sens: 1, snd: true, vib: true, dark: false }, ...extras() });
 
 // Saves from before `opened` was kept were made when the fields were the only world: open what they had opened then.
 const openedThen = s => ['easy', ...(levelsFor('easy').filter(l => l.world === 1).every(l => s.prog.easy.best[l.id]) ? ['normal'] : [])];
 
 function migrate(s) {
-  if (s?.v === V) { const m = { ...s, prog: { ...progFresh(), ...s.prog } }; return m.opened ? m : { ...m, opened: openedThen(m) }; }   // a difficulty added later starts empty
+  if (s?.v === V) { const m = { ...extras(), ...s, prog: { ...progFresh(), ...s.prog } }; return m.opened ? m : { ...m, opened: openedThen(m) }; }   // a difficulty added later starts empty
   if (s?.v === 1) {
     const d = defaultSave(), m = { ...d, coins: s.coins ?? 0, opt: { ...d.opt, ...s.opt }, prog: { ...d.prog, easy: { best: s.best || {}, reached: s.reached || 't1' } } };
     return { ...m, opened: openedThen(m) };
