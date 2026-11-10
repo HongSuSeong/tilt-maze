@@ -9,7 +9,7 @@ export const T = {
   lockHint: '코인을 모두 모아야 구멍이 열려요', moveHint: '움직이는 함정 구멍을 조심하세요',
   readyHold: '폰을 바닥과 수평으로 들고 시작을 누르세요',
   start: '시작', left: '남은 시간',
-  slotEmpty: '원소는 물의 세계부터', slotUse: '칸을 누르면 공이 원소를 둘러요', equip: '장착할 원소 (칸을 눌러 바꾸기)', none: '비움', pause: '일시 정지',
+  slotEmpty: '원소는 물의 세계부터', slotUse: '칸을 누르면 공이 원소를 둘러요', equip: '쓸 원소 두 개를 누르세요', none: '비움', pause: '일시 정지',
   resume: '계속하기', retry: '다시 하기', home: '처음 화면으로',
   clear: '통과!', reward: n => `코인 +${n}`, next: '다음 단계', lastDone: '들판을 모두 깼어요! 다음 세계는 곧 열려요.',
   fail: { timeout: '시간이 다 됐어요', trap: '함정 구멍에 빠졌어요', fire: '불기둥에 닿았어요', lava: '용암에 빠졌어요', drown: '깊은 물에 빠졌어요', shock: '전기에 감전됐어요', caught: '적에게 잡혔어요', fall: '틈으로 떨어졌어요' }, quench: '물에 닿아 불이 꺼졌어요',

@@ -10,7 +10,7 @@ import { levelById } from './levels/index.js';
 import { levelsFor } from './difficulty.js';
 import { loadSave, writeSave, markOpened, reachedOf, isOpen } from './save.js';
 import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear, useSlot, setSlots, SKIP_COST } from './run.js';
-import { ownedFor } from './elements.js';
+import { ownedFor, toggleElement } from './elements.js';
 import { buy, buyBoost, COLORS, PATTERNS, THEMES, BOOST_PRICES } from './shop.js';
 
 let save = loadSave();
@@ -40,7 +40,8 @@ async function stayAwake() { try { wake = await navigator.wakeLock?.request('scr
 
 function load(id) {
   const ls = levelsFor(save.diff), level = ls.find(l => l.id === id) || ls[0];
-  run = createRun(level, save.diff); run.boost = save.boost; view.load(level); theme(); music.setWorld(level.world);
+  const owned = ownedFor(level.world), last = save.picks?.[level.id]?.map(e => (owned.includes(e) ? e : null));   // what was worn here last time
+  run = createRun(level, save.diff, last); run.boost = save.boost; view.load(level); theme(); music.setWorld(level.world);
 }
 function goHome() {
   mode = 'home'; save = markOpened(save);
@@ -51,7 +52,7 @@ function ready() { mode = 'ready'; ui.show('ready', { level: run.level, slots: r
 
 const ui = createUI(document.body, {
   async play(id) { await unlock(); stayAwake(); load(id); ready(); },
-  start() { tilt.calibrate(); startRun(run); mode = 'play'; ui.show('play', { level: run.level }); },
+  start() { save = { ...save, picks: { ...save.picks, [run.level.id]: run.slots } }; keep(); tilt.calibrate(); startRun(run); mode = 'play'; ui.show('play', { level: run.level }); },
   pause() { if (run?.phase !== 'play') return; pauseRun(run); mode = 'pause'; ui.show('pause'); },
   resume() { tilt.calibrate(); resumeRun(run); mode = 'play'; ui.show('play', { level: run.level }); },
   retry() { retry(run); view.load(run.level); run.phase === 'rest' ? showRest() : ready(); },
@@ -84,11 +85,7 @@ const ui = createUI(document.body, {
     ui.ask(T.askBuy('boost', '', price), null, () => { save = buyBoost(save).save; keep(); sound.win(); ui.show('shop', { save }); });
   },
   useSlot(i) { if (run && useSlot(run, i)) { sound.coat(); view.burst(run.coat.el); } },
-  cycleSlot(i) {   // empty → each owned element → empty
-    const opts = [null, ...ownedFor(run.level.world)], next = opts[(opts.indexOf(run.slots[i]) + 1) % opts.length], sl = [...run.slots];
-    sl[i] = next; if (next && sl[1 - i] === next) sl[1 - i] = null;   // one element is worn from one slot
-    setSlots(run, sl); ready();
-  },
+  pickElement(el) { setSlots(run, toggleElement(run.slots, el)); ready(); },
 });
 
 function showRest() { mode = 'rest'; ui.show('rest', { left: run.restLeft, canSkip: save.coins >= SKIP_COST }); }

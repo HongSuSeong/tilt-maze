@@ -12,7 +12,9 @@ const fresh = run => Object.assign(run, {
 });
 
 // `level` is the stage as the difficulty makes it (see difficulty.js); `diff` says where the result is kept.
-export function createRun(level, diff = 'easy', slots = defaultSlots(level)) { return fresh({ level, diff, slots: [...slots], phase: 'ready', fails: 0, restLeft: 0 }); }
+export function createRun(level, diff = 'easy', slots) {
+  slots ??= defaultSlots(level);
+  return fresh({ level, diff, slots: [...slots], phase: 'ready', fails: 0, restLeft: 0 }); }
 export function setSlots(run, slots) { run.slots = [...slots]; }
 
 // Wear the element in slot i: it lasts its time, and the slot can be used again its rest after that.

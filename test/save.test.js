@@ -67,4 +67,5 @@ describe('save', () => {
     const s = defaultSave(); expect(s.opened).toEqual(['easy']);
     s.prog.easy.best = allFields(); expect(markOpened(s).opened).toEqual(['easy', 'normal']);
   });
+  it('remembers the elements picked for each stage', () => expect(defaultSave().picks).toEqual({}));
 });

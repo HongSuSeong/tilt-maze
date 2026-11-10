@@ -90,9 +90,9 @@ export function createUI(root, h) {
         bars(true); label(d.level);
         // small, so the board stays in view while the elements are chosen: a name, a line of advice, then the slots beside Start
         card(`<h2>${esc(d.level.name)}</h2><p>${esc(d.level.hint || (d.level.lock ? T.lockHint : d.level.traps?.some(t => t.to) ? T.moveHint : T.readyHold))}</p>
-          <div class="go-row">${equip(d.level, d.slots)}<button class="go" data-do="start">${T.start}</button></div>`);
+          ${equip(d.level, d.slots)}<button class="go" data-do="start">${T.start}</button>`);
         $('card').classList.add('compact');
-        for (const b of root.querySelectorAll('[data-slot]')) b.addEventListener('click', () => h.cycleSlot(+b.dataset.slot));
+        for (const b of root.querySelectorAll('[data-pick]')) b.addEventListener('click', () => h.pickElement(b.dataset.pick));
         slots(d.slots, null, [0, 0]);
         break;
       case 'play':
@@ -118,12 +118,14 @@ export function createUI(root, h) {
     }
   }
 
-  // the two slots on the ready card: tap one to change what goes in it
+  // the elements on the ready card, all in a row: a tap puts one on (its slot number shows), a second tap takes it off
   function equip(level, chosen) {
-    if (!ownedFor(level.world).length) return '';
-    return `<div class="equip" aria-label="${T.equip}">${chosen.map((el, i) => el
-      ? `<button data-slot="${i}" aria-label="칸 ${i + 1}: ${ELEMENTS[el].name}">${ICON[el]}${ELEMENTS[el].name}</button>`
-      : `<button data-slot="${i}" class="empty" aria-label="칸 ${i + 1}: ${T.none}">${T.none}</button>`).join('')}</div>`;
+    const owned = ownedFor(level.world);
+    if (!owned.length) return '';
+    return `<p class="note">${T.equip}</p><div class="tray" role="group" aria-label="${T.equip}">${owned.map(el => {
+      const at = chosen.indexOf(el);
+      return `<button data-pick="${el}" aria-pressed="${at >= 0}" aria-label="${ELEMENTS[el].name}${at >= 0 ? `, 칸 ${at + 1}` : ''}">${at >= 0 ? `<i class="nth">${at + 1}</i>` : ''}${ICON[el]}<span>${ELEMENTS[el].name}</span></button>`;
+    }).join('')}</div>`;
   }
   // the slots in the dock: what each holds, how long the coat has left, how long until it can be used again
   function slots(chosen, coat, cool) {

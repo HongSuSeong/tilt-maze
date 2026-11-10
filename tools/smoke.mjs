@@ -44,7 +44,7 @@ try {
   check(await page.getByRole('button', { name: /이어하기 · 물가 1/ }).isVisible(), 'an old save that cleared the fields goes on to the waterside');
   check(await page.getByRole('button', { name: '보통' }).getAttribute('data-locked') === null, 'and keeps normal open');
   await page.getByRole('button', { name: /이어하기/ }).click();
-  check(await page.getByRole('button', { name: /칸 1: 물/ }).first().isVisible(), 'the ready card offers water');
+  check(await page.getByRole('button', { name: /^물, 칸 1/ }).isVisible(), 'the ready card offers water, already in the first slot');
   await page.getByRole('button', { name: '시작' }).click();
   await page.locator('#slot0').dispatchEvent('pointerdown');
   check(await page.evaluate(() => window.__tm.run.coat?.el) === 'water', 'the slot coats the ball in water');
@@ -56,7 +56,12 @@ try {
   });
   await page.reload();
   check(await page.getByRole('button', { name: /이어하기 · 불의 협곡 1/ }).isVisible(), 'after the waterside comes the fire canyon');
-  await page.getByRole('button', { name: /이어하기/ }).click(); await page.getByRole('button', { name: '시작' }).click();
+  await page.getByRole('button', { name: /이어하기/ }).click();
+  await page.getByRole('button', { name: /^물/ }).click();
+  check(await page.evaluate(() => JSON.stringify(window.__tm.run.slots)) === '[null,"fire"]', 'a tap on a worn element takes it off');
+  await page.getByRole('button', { name: /^물/ }).click();
+  check(await page.evaluate(() => JSON.stringify(window.__tm.run.slots)) === '["water","fire"]', 'and another puts it back');
+  await page.getByRole('button', { name: '시작' }).click();
   await page.locator('#slot1').dispatchEvent('pointerdown');
   check(await page.evaluate(() => window.__tm.run.coat?.el) === 'fire', 'the second slot coats the ball in fire');
   // the fire canyon cleared: the ice field, with fire and ice worn by default

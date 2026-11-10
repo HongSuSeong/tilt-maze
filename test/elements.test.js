@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ELEMENTS, ownedFor, defaultSlots } from '../src/elements.js';
+import { ELEMENTS, ownedFor, defaultSlots, toggleElement } from '../src/elements.js';
 import { createRun, startRun, tickRun, useSlot, setSlots, retry } from '../src/run.js';
 
 const L = (o = {}) => ({ id: 'x', world: 2, time: 60, start: { x: 30, y: 80 }, hole: { x: 90, y: 150, r: 7.4 }, walls: [], coins: [], fires: [{ x: 75, y: 80, r: 5 }], ...o });
@@ -64,4 +64,11 @@ describe('elements', () => {
     const r = createRun(L()); r.boost = 2; startRun(r); useSlot(r, 0);
     expect(r.coat.left).toBe(7); expect(r.cool[0]).toBe(10);
   });
+  it('picking: a tap puts an element in the free slot, a second tap takes it out', () => {
+    expect(toggleElement([null, null], 'fire')).toEqual(['fire', null]);
+    expect(toggleElement(['fire', null], 'ice')).toEqual(['fire', 'ice']);
+    expect(toggleElement(['fire', 'ice'], 'fire')).toEqual([null, 'ice']);
+    expect(toggleElement([null, 'ice'], 'gas')).toEqual(['gas', 'ice']);
+  });
+  it('with both slots full, a third pick takes the place of the older one', () => expect(toggleElement(['fire', 'ice'], 'gas')).toEqual(['ice', 'gas']));
 });

@@ -12,3 +12,12 @@ export const WORLD_ELEMENT = { 2: 'water', 3: 'fire', 4: 'ice', 5: 'spark', 6: '
 export const ownedFor = world => Object.entries(WORLD_ELEMENT).filter(([w]) => +w <= world).map(([, e]) => e);
 // the last two gained, so the newest is always worn in its own world
 export function defaultSlots(level) { const o = ownedFor(level.world).slice(-2); return [o[0] ?? null, o[1] ?? null]; }
+
+// Picking before a stage: a tap puts the element in the free slot, a second tap takes it out; with both full the
+// older one makes room.
+export function toggleElement(slots, el) {
+  if (slots.includes(el)) return slots.map(s => (s === el ? null : s));
+  const free = slots.indexOf(null);
+  if (free >= 0) { const out = [...slots]; out[free] = el; return out; }
+  return [slots[1], el];
+}
