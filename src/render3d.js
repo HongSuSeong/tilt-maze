@@ -47,28 +47,41 @@ const ballTex = look => {   // the player's look (see look.js); a pattern shows 
 };
 const LOOK0 = { mode: 'pattern', pattern: 'dots', base: 'coral', accent: 'cream', pixels: [] };
 
-// Lava in the soft-toy look: a glossy orange jelly with pale round blobs drifting slowly across it and a soft sheen,
-// smooth low-frequency noise only, so it sits with the rounded blocks rather than looking like real rock.
-function lavaMaterial() {
+// Liquids in the soft-toy look (lava, puddles, deep water): a glossy jelly of colour `a` with soft round blobs of
+// colour `b` drifting slowly across it and a gloss passing over, smooth low-frequency noise only.
+function jelly(a, b, speed = 1) {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uA: { value: new THREE.Color(a) }, uB: { value: new THREE.Color(b) }, uS: { value: speed } },
     vertexShader: `varying vec2 vP; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vP = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }`,
     fragmentShader: `
-      uniform float uTime; varying vec2 vP;
+      uniform float uTime, uS; uniform vec3 uA, uB; varying vec2 vP;
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p) { vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
       void main() {
-        vec2 p = vP * 0.9;
-        float n = noise(p + vec2(uTime * 0.16, uTime * 0.1)) * 0.6 + noise(p * 1.7 - uTime * 0.12) * 0.4;
-        float blob = smoothstep(0.6, 0.68, n);                                   // pale round spots, soft-edged
-        vec3 col = mix(vec3(1.0, 0.195, 0.045), vec3(1.0, 0.56, 0.15), blob);    // #FF7A3C and #FFC56B, in linear
-        float sheen = smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(vP.x * 0.7 + vP.y * 0.5 + uTime * 0.7));
-        col += vec3(0.35, 0.25, 0.15) * sheen * 0.35;                            // a gloss passing over it
+        float t = uTime * uS; vec2 p = vP * 0.9;
+        float n = noise(p + vec2(t * 0.16, t * 0.1)) * 0.6 + noise(p * 1.7 - t * 0.12) * 0.4;
+        vec3 col = mix(uA, uB, smoothstep(0.6, 0.68, n));
+        col += vec3(0.3) * smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(vP.x * 0.7 + vP.y * 0.5 + t * 0.7)) * 0.3;
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
       }`,
   });
+}
+// a pattern drawn once and repeated over something `n` times along its length (turned a quarter for walls that run down the board)
+function repeated(tex, n, down = false) {
+  const t = tex.clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.center.set(0.5, 0.5);
+  t.repeat.set(Math.max(1, n), 1); t.rotation = down ? Math.PI / 2 : 0; t.needsUpdate = true; return t;
+}
+// a cartoon flame: round below, pointed above, dark outline, yellow heart in front
+const FLAME_PTS = [[0, 0], [0.55, 0.08], [0.8, 0.35], [0.72, 0.75], [0.45, 1.15], [0.18, 1.5], [0, 1.7]];
+function flameShape(k) {
+  const g = new THREE.Group(), geo = new THREE.LatheGeometry(FLAME_PTS.map(([x, y]) => new THREE.Vector2(x * k, y * k)), 20);
+  const body = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: '#FF6A2E', emissive: '#FF5A1E', emissiveIntensity: 0.45, roughness: 0.5 }));
+  const edge = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#7A2410', side: THREE.BackSide })); edge.scale.setScalar(1.1);
+  const heart = new THREE.Mesh(new THREE.LatheGeometry(FLAME_PTS.map(([x, y]) => new THREE.Vector2(x * k * 0.55, y * k * 0.55)), 16), new THREE.MeshStandardMaterial({ color: '#FFD24A', emissive: '#FFB800', emissiveIntensity: 0.7 }));
+  heart.position.set(0, 0.02, k * 0.45); heart.scale.z = 0.4;
+  g.add(edge, body, heart); return g;
 }
 
 export function createView(container) {
@@ -90,7 +103,7 @@ export function createView(container) {
     coin: new THREE.MeshStandardMaterial({ color: '#FFD34E', metalness: 0.05, roughness: 0.35, emissive: '#E0A100' }),
     ball: new THREE.MeshStandardMaterial({ map: ballTex(LOOK0), roughness: 0.32 }),
     trail: new THREE.MeshBasicMaterial({ color: '#FF9A55', transparent: true, depthWrite: false }),
-    pool: new THREE.MeshStandardMaterial({ color: '#8FD3FF', roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.8 }),
+    pool: jelly('#8FD3FF', '#E1F5FF', 0.7), poolRim: new THREE.MeshStandardMaterial({ color: '#BFE7FF', roughness: 0.5 }),
     vent: new THREE.MeshStandardMaterial({ color: '#8B5A48', roughness: 0.8 }),
     flame: new THREE.MeshStandardMaterial({ color: '#FF8A3D', emissive: '#FF5A1E', emissiveIntensity: 1.2, transparent: true, opacity: 0.92 }),
     core: new THREE.MeshStandardMaterial({ color: '#FFE08A', emissive: '#FFC23D', emissiveIntensity: 1.4 }),
@@ -99,7 +112,7 @@ export function createView(container) {
     vine: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#6FBF5A'; g.fillRect(0, 0, w, h); g.fillStyle = '#4E9A3E'; for (let i = 0; i < 40; i++) { g.beginPath(); g.ellipse((i * 53) % w, (i * 29) % h, 9, 5, i, 0, 7); g.fill(); } }), roughness: 0.8 }),
     ice: new THREE.MeshStandardMaterial({ color: '#CFEFFF', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.78 }),
     door: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#B07A4F'; g.fillRect(0, 0, w, h); g.fillStyle = '#8A5A36'; for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 4, h); }), roughness: 0.7 }),
-    lava: lavaMaterial(),
+    lava: jelly('#FF7A3C', '#FFC56B'),
     stone: new THREE.MeshStandardMaterial({ map: canvasTex(256, 256, (g, w, h) => {   // lava gone cold: soft grey pebbles
       g.fillStyle = '#C2B8B0'; g.fillRect(0, 0, w, h); g.fillStyle = '#AEA39A';
       for (let i = 0; i < 26; i++) { g.beginPath(); g.ellipse((i * 71) % w, (i * 113) % h, 14 + (i % 3) * 6, 10 + (i % 4) * 4, i, 0, 7); g.fill(); }
@@ -107,14 +120,23 @@ export function createView(container) {
     rim: new THREE.MeshStandardMaterial({ color: '#E0784A', roughness: 0.6 }),
     bubble: new THREE.MeshStandardMaterial({ color: '#FFD089', emissive: '#FFB347', emissiveIntensity: 0.4, roughness: 0.3 }),
     post: new THREE.MeshStandardMaterial({ color: '#6B4A35', roughness: 0.8 }),
-    slick: new THREE.MeshStandardMaterial({ color: '#F4FBFF', roughness: 0.04, metalness: 0.25, transparent: true, opacity: 0.85 }),
-    deep: new THREE.MeshStandardMaterial({ color: '#2F7FB8', roughness: 0.1, metalness: 0.1 }),
+    slick: new THREE.MeshStandardMaterial({ map: canvasTex(128, 128, (g, w, h) => {   // pale ice with white glints across it
+      g.fillStyle = '#CDEEFF'; g.fillRect(0, 0, w, h); g.strokeStyle = '#FFFFFF'; g.lineCap = 'round';
+      for (const [x, y, l, lw] of [[20, 30, 40, 6], [70, 20, 22, 4], [40, 90, 34, 5], [96, 76, 18, 3]]) { g.lineWidth = lw; g.beginPath(); g.moveTo(x, y + l * 0.6); g.lineTo(x + l * 0.6, y); g.stroke(); }
+    }), roughness: 0.06, metalness: 0.1 }),
+    slickRim: new THREE.MeshStandardMaterial({ color: '#BFE7F7', roughness: 0.3 }),
+    deep: jelly('#2F7FB8', '#5BB8F5', 0.5), deepRim: new THREE.MeshStandardMaterial({ color: '#1E5A86', roughness: 0.6 }),
     fence: new THREE.MeshStandardMaterial({ map: canvasTex(128, 32, (g, w, h) => { g.fillStyle = '#FFD23F'; g.fillRect(0, 0, w, h); g.fillStyle = '#2B2F45'; for (let x = -32; x < w; x += 24) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 12, 0); g.lineTo(x + 24, 0); g.lineTo(x + 12, h); g.fill(); } }), emissive: '#FFB800', emissiveIntensity: 0.25, roughness: 0.5 }),
-    zap: new THREE.MeshStandardMaterial({ map: canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#DCE8FF'; g.fillRect(0, 0, w, h); g.strokeStyle = '#7FA2FF'; g.lineWidth = 6; for (let x = 0; x <= w; x += 32) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.moveTo(0, x); g.lineTo(w, x); g.stroke(); } }), emissive: '#5B8CFF', emissiveIntensity: 0.6, roughness: 0.6 }),
-    box: new THREE.MeshStandardMaterial({ color: '#FFD23F', emissive: '#FFB800', emissiveIntensity: 0 }),
+    zap: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // rounded lemon tiles, each with a bolt
+      g.fillStyle = '#E8D88A'; g.fillRect(0, 0, w, h); g.fillStyle = '#FFE98A'; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 12); g.fill();
+      g.fillStyle = '#F2B800'; g.beginPath(); [[36, 12], [22, 34], [31, 34], [26, 52], [42, 28], [33, 28], [38, 12]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
+    }), emissive: '#FFD23F', emissiveIntensity: 0.6, roughness: 0.6 }),
+    box: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // a round button with a bolt on it
+      g.fillStyle = '#FFD23F'; g.fillRect(0, 0, w, h); g.fillStyle = '#3B4778'; g.beginPath(); [[36, 10], [20, 34], [31, 34], [25, 54], [44, 26], [33, 26], [39, 10]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
+    }), emissive: '#FFB800', emissiveIntensity: 0 }),
     foe: new THREE.MeshStandardMaterial({ color: '#8A6BFF', emissive: '#5A3FD9', emissiveIntensity: 0.35, roughness: 0.4 }),
     eye: new THREE.MeshBasicMaterial({ color: '#FFFFFF' }),
-    gap: new THREE.MeshBasicMaterial({ color: '#1E2A33' }),
+    gap: new THREE.MeshBasicMaterial({ color: '#162029' }), gapRim: new THREE.MeshStandardMaterial({ color: '#5B6B78', roughness: 0.7 }),
     thick: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#A39A90'; g.fillRect(0, 0, w, h); g.strokeStyle = '#7E756C'; g.lineWidth = 4; for (let r = 0; r < 2; r++) for (let x = (r % 2) * 24; x < w; x += 48) g.strokeRect(x, r * h / 2, 48, h / 2); }), roughness: 0.95 }),
   };
   const WALL_MAT = { wall: mat.wall, crack: mat.crack, vine: mat.vine, ice: mat.ice, door: mat.door, fence: mat.fence, thick: mat.thick };
@@ -125,7 +147,7 @@ export function createView(container) {
   const lamp = new THREE.PointLight('#fff2dd', 0, 5.5, 1.6); lamp.castShadow = false;   // in the dark, the ball carries the only light
   const trail = Array.from({ length: 24 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), mat.trail.clone()); m.visible = false; return { m, t: 9 }; });
   const bitGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16), coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 28);
-  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
+  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], zapMats = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
 
   function paint() {
@@ -140,6 +162,9 @@ export function createView(container) {
   }
 
   function block(w, m) {
+    if (m.map && m !== mat.wall) {   // a patterned wall gets its own copy of the pattern, repeated along it instead of stretched
+      const down = w.h > w.w; m = m.clone(); m.map = repeated(m.map, Math.round(Math.max(w.w, w.h) / 22), down);
+    }
     const g = new RoundedBoxGeometry(w.w * U, WALL_H, w.h * U, 3, Math.min(0.22, Math.min(w.w, w.h) * U * 0.45));
     const mesh = new THREE.Mesh(g, m); mesh.position.set(X(w.x + w.w / 2), WALL_H / 2, Z(w.y + w.h / 2)); mesh.castShadow = mesh.receiveShadow = true;
     board.add(mesh); return mesh;
@@ -174,32 +199,35 @@ export function createView(container) {
       const badge = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 24), mat.coin); badge.position.y = 0.13; lid.add(badge);
       board.add(lid);
     }
-    for (const p of lv.pools || []) {
-      const m = new THREE.Mesh(roundRect(p.w * U, p.h * U, Math.min(p.w, p.h) * U * 0.45), mat.pool); m.rotation.x = -Math.PI / 2; m.position.set(X(p.x + p.w / 2), 0.01, Z(p.y + p.h / 2)); m.receiveShadow = true; board.add(m);
-    }
-    fires = (lv.fires || []).map(f => {   // a vent with a flame standing on it
+    const flat = (r, m, y, rim) => {   // a patch on the floor, rounded, with a rim of its own colour round it
+      if (rim) { const e = new THREE.Mesh(roundRect(r.w * U + 0.26, r.h * U + 0.26, Math.min(r.w, r.h) * U * 0.25 + 0.13), rim); e.rotation.x = -Math.PI / 2; e.position.set(X(r.x + r.w / 2), y - 0.002, Z(r.y + r.h / 2)); e.receiveShadow = true; board.add(e); }
+      if (m.map) { m = m.clone(); m.map = m.map.clone(); m.map.wrapS = m.map.wrapT = THREE.RepeatWrapping; const tile = m === mat.zap ? 0.8 : 1.6; m.map.repeat.set(1 / tile, 1 / tile); m.map.needsUpdate = true; }   // a flat shape's texture coordinates are in board units: one tile each `tile` units
+      const g = new THREE.Mesh(roundRect(r.w * U, r.h * U, Math.min(r.w, r.h) * U * 0.25), m); g.rotation.x = -Math.PI / 2; g.position.set(X(r.x + r.w / 2), y, Z(r.y + r.h / 2)); g.receiveShadow = true; board.add(g); return g;
+    };
+    for (const p of lv.pools || []) flat(p, mat.pool, 0.01, mat.poolRim);
+    fires = (lv.fires || []).map(f => {   // a vent with a cartoon flame standing on it
       const g = new THREE.Group(); g.position.set(X(f.x), 0, Z(f.y));
       const vent = new THREE.Mesh(new THREE.CylinderGeometry(f.r * U * 0.85, f.r * U, 0.16, 20), mat.vent); vent.position.y = 0.08; vent.receiveShadow = true; g.add(vent);
-      const flame = new THREE.Mesh(new THREE.ConeGeometry(f.r * U * 0.8, 1.5, 18), mat.flame); flame.position.y = 0.9; g.add(flame);
-      const core = new THREE.Mesh(new THREE.ConeGeometry(f.r * U * 0.4, 0.9, 14), mat.core); core.position.y = 0.6; g.add(core);
-      board.add(g); return { g, flame, core, f };
+      const flame = flameShape(f.r * U * 1.25); flame.position.y = 0.12; g.add(flame);   // tall enough to read from above
+      board.add(g); return { g, flame, core: flame, f };
     });
-    const flat = (r, m, y) => { const g = new THREE.Mesh(roundRect(r.w * U, r.h * U, Math.min(r.w, r.h) * U * 0.25), m); g.rotation.x = -Math.PI / 2; g.position.set(X(r.x + r.w / 2), y, Z(r.y + r.h / 2)); g.receiveShadow = true; board.add(g); return g; };
-    for (const r of lv.slick || []) flat(r, mat.slick, 0.006);
-    deeps = (lv.deep || []).map(r => flat(r, mat.deep, 0.009));
-    for (const z of lv.zaps || []) flat(z, mat.zap, 0.007);
-    for (const g of lv.gaps || []) flat(g, mat.gap, 0.011);
+    zapMats = [];
+    for (const r of lv.slick || []) flat(r, mat.slick, 0.006, mat.slickRim);
+    deeps = (lv.deep || []).map(r => flat(r, mat.deep, 0.009, mat.deepRim));
+    for (const z of lv.zaps || []) zapMats.push(flat(z, mat.zap, 0.007).material);
+    for (const g of lv.gaps || []) flat(g, mat.gap, 0.011, mat.gapRim);
     winds = (lv.winds || []).map(a => {   // stripes that run the way the wind blows
       const t = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 5; for (let y = 8; y < h; y += 21) { g.beginPath(); g.moveTo(8, y); g.lineTo(40, y); g.lineTo(32, y - 6); g.moveTo(40, y); g.lineTo(32, y + 6); g.stroke(); } });
-      t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(a.w / 22, a.h / 22); t.center.set(0.5, 0.5); t.rotation = -Math.atan2(a.dy, a.dx);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 2.2, 1 / 2.2); t.rotation = -Math.atan2(a.dy, a.dx);   // one arrow tile each 2.2 units
       const m = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.75, depthWrite: false, color: "#5FA88A" });
       flat(a, m, 0.013); return { t, a };
     });
-    switches = (lv.switches || []).map(w => {   // a post with a box that lights when powered
+    switches = (lv.switches || []).map(w => {   // a round button with a bolt on top, on a short base; it lights when powered
       const g = new THREE.Group(); g.position.set(X(w.x), 0, Z(w.y));
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 10), mat.post); post.position.y = 0.35; g.add(post);
-      const box = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.3, 0.36), mat.box.clone()); box.position.y = 0.8; box.castShadow = true; g.add(box);
-      board.add(g); return box;
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.12, 24), mat.post); base.position.y = 0.06; base.receiveShadow = true; g.add(base);
+      const top = mat.box.clone(), side = new THREE.MeshStandardMaterial({ color: '#E8B800', emissive: '#FFB800', emissiveIntensity: 0 });
+      const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.16, 24), [side, top, side]); btn.position.y = 0.2; btn.castShadow = true; g.add(btn);
+      board.add(g); return { material: { set emissiveIntensity(v) { top.emissiveIntensity = side.emissiveIntensity = v; } } };
     });
     foes = (lv.enemies || []).map(() => {   // a purple ball with two cross eyes
       const g = new THREE.Group(), body = new THREE.Mesh(new THREE.SphereGeometry(0.36, 24, 16), mat.foe); body.castShadow = true; g.add(body);
@@ -219,7 +247,7 @@ export function createView(container) {
       const g = new THREE.Group(); g.position.set(X(t.x), 0, Z(t.y));
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.9, 10), mat.post); post.position.y = 0.45; post.castShadow = true; g.add(post);
       const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.14, 0.18, 14), mat.vent); bowl.position.y = 0.95; g.add(bowl);
-      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.6, 14), mat.flame); flame.position.y = 1.35; flame.visible = false; g.add(flame);
+      const flame = flameShape(0.2); flame.position.y = 1.02; flame.visible = false; g.add(flame);
       board.add(g); return { g, flame };
     });
     board.add(ball); board.add(coat); board.add(lamp); board.add(aura.group); for (const t of trail) { t.m.visible = false; board.add(t.m); }
@@ -268,16 +296,16 @@ export function createView(container) {
         B.b.visible = !cold; const k = B.t < 0.95 ? B.t / 0.95 : 1 + (B.t - 0.95) * 6; B.b.scale.set(k, k * 0.6, k);
       }
     });
-    mat.lava.uniforms.uTime.value = clock;
+    mat.lava.uniforms.uTime.value = mat.pool.uniforms.uTime.value = mat.deep.uniforms.uTime.value = clock;
     deeps.forEach((m, i) => { m.material = run.state.frozen?.has(i) ? mat.slick : mat.deep; });
     switches.forEach((b, i) => { b.material.emissiveIntensity = run.state.powered?.has(i) ? 1.2 : 0; });
-    mat.zap.emissiveIntensity = (run.state.clock || 0) % 4 < 2 ? 0.7 + 0.3 * Math.sin(clock * 30) : 0.05;   // on for two seconds, off for two
+    const zapOn = (run.state.clock || 0) % 4 < 2; for (const m of zapMats) m.emissiveIntensity = zapOn ? 0.22 + 0.12 * Math.sin(clock * 30) : 0;   // on for two seconds, off for two
     foes.forEach((g, i) => { const f = run.state.foes?.[i] || level.enemies[i]; g.position.set(X(f.x), 0.36 + 0.05 * Math.sin(clock * 6 + i), Z(f.y)); g.lookAt(ball.position.x, g.position.y, ball.position.z); });
     torches.forEach((t, i) => { t.flame.visible = !!run.state.lit?.has(i); t.flame.scale.set(1, 1 + 0.15 * Math.sin(clock * 11 + i), 1); });
     for (const w of winds) { const sp = Math.hypot(w.a.dx, w.a.dy) / 600 * dt; w.t.offset.x -= sp; }   // the stripes drift with the wind
     fires.forEach((F, i) => {   // flames sway; put out, only the vent is left
-      const out = run.state.doused?.has(i); F.flame.visible = F.core.visible = !out;
-      const k = 1 + 0.12 * Math.sin(clock * 9 + i) + 0.06 * Math.sin(clock * 23 + i * 2); F.flame.scale.set(1, k, 1); F.core.scale.set(1, 2 - k, 1);
+      F.flame.visible = !run.state.doused?.has(i);
+      const k = 1 + 0.12 * Math.sin(clock * 9 + i) + 0.06 * Math.sin(clock * 23 + i * 2); F.flame.scale.set(1 / Math.sqrt(k), k, 1 / Math.sqrt(k));   // it sways
     });
     for (let i = puffs.length - 1; i >= 0; i--) {
       const p = puffs[i]; p.t += dt; p.m.position.y += p.v * dt; p.m.scale.setScalar(1 + p.t * 1.5); p.m.material.opacity = Math.max(0, 0.7 * (1 - p.t / 1.4));
