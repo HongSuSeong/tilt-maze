@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { FEEL } from './feel.js';
 
 const r = FEEL.R * 0.1;   // the ball's radius on the board
-const COLOR = { water: '#5BB8F5', fire: '#FF6A2E', ice: '#9FE3F7', spark: '#FFD23F', stone: '#A39A90', gas: '#B8E986' };
+const COLOR = { water: '#5BB8F5', fire: '#FF6A2E', ice: '#9FE3F7', spark: '#FFD23F', stone: '#A39A90', gas: '#B8E986', steam: '#EAF4FF', snow: '#F7FBFF', blast: '#FF5A3C' };
 
 const lathe = (pts, s) => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x * s, y * s)), 20);
 function sticker(geo, color, line, { opacity = 1, emissive = 0, outline = 1.1, flat = false } = {}) {
@@ -57,15 +57,31 @@ function build(el) {
     }
   }
   if (el === 'stone') g.add(sticker(new THREE.DodecahedronGeometry(r * 1.15, 0), '#A39A90', '#4A403C', { flat: true, outline: 1.07 }));   // a lump of rock
-  if (el === 'gas') {   // a puffy little cloud of gas, with wisps of haze drifting round it (no face: it is not anyone)
-    const puff = (k, x, y, z) => { const p = sticker(new THREE.SphereGeometry(k, 20, 14), '#B8E986', '#5E9B3A', { opacity: 0.96, outline: 1.08 }); p.position.set(x, y, z); return p; };
+  if (el === 'gas' || el === 'steam') {   // a puffy little cloud (green gas, or white steam), with wisps of haze drifting round it (no face: it is not anyone)
+    const [body, line, wisp] = el === 'gas' ? ['#B8E986', '#5E9B3A', '#DDF5C4'] : ['#F4F9FF', '#7FA3C4', '#FFFFFF'];
+    const puff = (k, x, y, z) => { const p = sticker(new THREE.SphereGeometry(k, 20, 14), body, line, { opacity: 0.96, outline: 1.08 }); p.position.set(x, y, z); return p; };
     g.add(puff(r * 0.8, 0, 0, 0), puff(r * 0.5, r * 0.6, r * 0.3, 0.1), puff(r * 0.5, -r * 0.6, r * 0.25, 0.05), puff(r * 0.45, 0, r * 0.7, -0.05), puff(r * 0.4, r * 0.3, -r * 0.4, r * 0.4));
     const haze = new THREE.Group(); haze.userData.haze = true;
     for (let k = 0; k < 7; k++) {
-      const a = k / 7 * Math.PI * 2, w = new THREE.Mesh(new THREE.SphereGeometry(r * (0.22 + 0.08 * (k % 3)), 12, 8), new THREE.MeshBasicMaterial({ color: '#DDF5C4', transparent: true, opacity: 0.45, depthWrite: false }));
+      const a = k / 7 * Math.PI * 2, w = new THREE.Mesh(new THREE.SphereGeometry(r * (0.22 + 0.08 * (k % 3)), 12, 8), new THREE.MeshBasicMaterial({ color: wisp, transparent: true, opacity: 0.45, depthWrite: false }));
       w.position.set(Math.cos(a) * r * 1.35, r * (0.1 * (k % 4) - 0.1), Math.sin(a) * r * 1.35); haze.add(w);
     }
     g.add(haze);
+  }
+  if (el === 'snow') {   // a snowball with blue-grey flecks, so its rolling shows
+    g.add(sticker(new THREE.SphereGeometry(r * 0.95, 24, 16), '#F7FBFF', '#7FA7C9', { outline: 1.07 }));
+    for (let k = 0; k < 9; k++) {
+      const u = k / 9 * Math.PI * 2, v = Math.acos(1 - 2 * ((k * 0.618) % 1)), m = new THREE.Mesh(new THREE.SphereGeometry(r * 0.11, 8, 6), new THREE.MeshStandardMaterial({ color: '#BFD6EA' }));
+      m.position.set(Math.sin(v) * Math.cos(u) * r * 0.93, Math.cos(v) * r * 0.93, Math.sin(v) * Math.sin(u) * r * 0.93); m.scale.set(1, 1, 0.4); m.lookAt(0, 0, 0); g.add(m);
+    }
+  }
+  if (el === 'blast') {   // a fireball shooting along: a hot round head and a flame tail streaming behind it
+    g.add(sticker(new THREE.SphereGeometry(r * 0.8, 24, 16), '#FF5A3C', '#7A2410', { emissive: 0.45, outline: 1.09 }));
+    const heart = new THREE.Mesh(new THREE.SphereGeometry(r * 0.45, 16, 12), new THREE.MeshStandardMaterial({ color: '#FFD24A', emissive: '#FFB800', emissiveIntensity: 0.8 }));
+    heart.position.set(0, r * 0.1, r * 0.45); g.add(heart);
+    [['#FF7A2E', 0.75, 1.2], ['#FFB02E', 0.5, 1.9], ['#FFE35C', 0.3, 2.5]].forEach(([c, w, back]) => {   // the tail, behind the way it goes (-z)
+      const t = sticker(new THREE.ConeGeometry(r * w, r * 1.4, 16), c, '#7A2410', { emissive: 0.4, outline: 1.1 }); t.rotation.x = -Math.PI / 2; t.position.z = -r * back; g.add(t);
+    });
   }
   g.visible = false; return g;
 }
@@ -73,11 +89,13 @@ function build(el) {
 // Each form sits in a rig so it can move like something rolling while it stays upright: turned to face where it
 // goes (yaw), leaning into it (tilt), stretched with speed and squashed by a knock (also tilt), hopping as it goes.
 // Ice and stone are hard things, and simply roll.
-const ROLLS = new Set(['ice', 'stone']);
+const ROLLS = new Set(['ice', 'stone', 'snow']);
 const TRAIL = {   // what a form leaves behind: colour, size, how it moves (up, gravity), how long it lasts
   fire: { c: '#FF9A3D', s: 0.12, up: 1.6, g: 0, life: 0.55, grow: 0.5 }, water: { c: '#7CCBF5', s: 0.1, up: 1.6, g: 9, life: 0.5 },
   ice: { c: '#FFFFFF', s: 0.08, up: 0.6, g: 0, life: 0.6 }, spark: { c: '#FFE35C', s: 0.08, up: 1.0, g: 0, life: 0.3, jitter: 4 },
   stone: { c: '#B8ADA3', s: 0.1, up: 0.3, g: 0, life: 0.6, grow: 2.5 }, gas: { c: '#DDF5C4', s: 0.12, up: 0.5, g: 0, life: 0.8, grow: 2 },
+  steam: { c: '#FFFFFF', s: 0.12, up: 0.9, g: 0, life: 0.8, grow: 2 }, snow: { c: '#FFFFFF', s: 0.07, up: 0.5, g: 5, life: 0.5 },
+  blast: { c: '#FF8A3D', s: 0.16, up: 1.2, g: 0, life: 0.4, grow: 1 },
 };
 
 export function createAura() {
@@ -131,7 +149,10 @@ export function createAura() {
       if (el === 'fire') { const k = 1 + 0.1 * Math.sin(clock * 13); f.scale.set(1 / Math.sqrt(k), k, 1 / Math.sqrt(k)); }   // it flickers
       if (el === 'water') { const k = 1 + 0.05 * Math.sin(clock * 6); f.scale.set(k, 1 / k, k); }   // it wobbles
       if (el === 'spark') { f.rotation.y += dt * 5; f.children.forEach((c, i) => { if (i) c.visible = Math.sin(clock * 30 + i * 2) > -0.5; }); }
-      if (el === 'gas') { const k = 1 + 0.06 * Math.sin(clock * 4); f.scale.setScalar(k); f.children.at(-1).rotation.y += dt * 2.2; f.children.at(-1).children.forEach((w, i) => { w.position.y = r * (0.1 * (i % 4) - 0.1) + 0.06 * Math.sin(clock * 3 + i); }); }
+      if (el === 'steam') wrap.position.y += r * 0.5 + 0.04 * Math.sin(clock * 3);   // it floats
+      if (el === 'snow') { const k = 1 + Math.min(0.5, (run.state.snow || 0) / 120); f.scale.setScalar(k); wrap.position.y += (k - 1) * r; }   // it grows as it rolls
+      if (el === 'blast') { const k = 1 + 0.08 * Math.sin(clock * 20); f.scale.set(k, k, 1 / k); }
+      if (el === 'gas' || el === 'steam') { const k = 1 + 0.06 * Math.sin(clock * 4); f.scale.setScalar(k); f.children.at(-1).rotation.y += dt * 2.2; f.children.at(-1).children.forEach((w, i) => { w.position.y = r * (0.1 * (i % 4) - 0.1) + 0.06 * Math.sin(clock * 3 + i); }); }
     }
     for (let i = trail.length - 1; i >= 0; i--) {
       const p = trail[i], T = p.T; p.t += dt;

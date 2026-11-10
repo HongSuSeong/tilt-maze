@@ -98,9 +98,9 @@ export function generate(world, index, diff = 'hard') {
     if (el === 'freeze') { o.pools.push(floor(c)); walls.push(plug(c, next, T)); }   // stone would sink before the wall
     if (el === 'wire') {   // a fence, and its switch just past it where the puddle reaches under the fence
       const a = center(c), b = center(next), dx = Math.sign(b.x - a.x), dy = Math.sign(b.y - a.y), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, f = floor(c);
-      const x0 = dx < 0 ? m.x - 8 : f.x, x1 = dx > 0 ? m.x + 8 : f.x + f.w, y0 = dy < 0 ? m.y - 8 : f.y, y1 = dy > 0 ? m.y + 8 : f.y + f.h;
+      const x0 = dx < 0 ? m.x - 11 : f.x, x1 = dx > 0 ? m.x + 11 : f.x + f.w, y0 = dy < 0 ? m.y - 11 : f.y, y1 = dy > 0 ? m.y + 11 : f.y + f.h;
       o.pools.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
-      o.switches.push({ x: m.x + dx * 6, y: m.y + dy * 6, open: [walls.length] }); walls.push(plug(c, next, E));
+      o.switches.push({ x: m.x + dx * 8, y: m.y + dy * 8, open: [walls.length] }); walls.push(plug(c, next, E));
     }
   });
   // what each world adds along the rest of the way

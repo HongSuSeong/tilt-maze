@@ -12,7 +12,7 @@ const progFresh = () => Object.fromEntries(BUILT.map(d => [d, { best: {}, reache
 // without them takes these
 const extras = () => ({
   look: { mode: 'pattern', pattern: 'dots', base: 'coral', accent: 'cream', pixels: Array(128).fill(null) },
-  owned: { patterns: ['dots', 'stripes'], colors: ['coral', 'mint', 'cream'], themes: ['toy'] }, boost: 0, theme: 'toy', picks: {},   // picks: the elements last worn on each stage
+  owned: { patterns: ['dots', 'stripes'], colors: ['coral', 'mint', 'cream'], themes: ['toy'] }, boost: 0, theme: 'toy', picks: {}, found: [],   // picks: the elements last worn on each stage; found: the fusions in the book
 });
 export const defaultSave = () => ({ v: V, coins: 0, diff: 'easy', prog: progFresh(), opened: ['easy'], opt: { sens: 1, snd: true, vib: true, dark: false }, ...extras() });
 
@@ -43,6 +43,13 @@ export function recordClear(s, diff, id, stars, time, coins) {
   const p = s.prog[diff], was = p.best[id], best = was ? { stars: Math.max(was.stars, stars), time: Math.min(was.time, time) } : { stars, time };
   const next = nextLevel(id, diff), reached = next && order(diff, next.id) > order(diff, p.reached) ? next.id : p.reached;
   return { ...s, coins: s.coins + coins, prog: { ...s.prog, [diff]: { best: { ...p.best, [id]: best }, reached } } };
+}
+
+// A fusion made for the first time goes in the book, with coins for finding it.
+export const FIND_REWARD = 10;
+export function discover(s, id) {
+  if (s.found.includes(id)) return { save: s, isNew: false };
+  return { save: { ...s, found: [...s.found, id], coins: s.coins + FIND_REWARD }, isNew: true };
 }
 
 // Easy is always open; each next one opens when every stage of the one before (practice aside) is cleared, and once

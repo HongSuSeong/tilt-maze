@@ -155,7 +155,7 @@ export function createView(container) {
   let theme = 'toy';
   const outlineMat = new THREE.MeshBasicMaterial({ color: '#2B1B5A', side: THREE.BackSide });
   const ballEdge = new THREE.Mesh(new THREE.SphereGeometry(R * U, 24, 16), outlineMat); ballEdge.scale.setScalar(1.14); ball.add(ballEdge);   // the cartoon look outlines the ball too
-  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], zapMats = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
+  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], pools = [], zapMats = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
 
   function paint() {
@@ -183,7 +183,7 @@ export function createView(container) {
 
   function clear() {
     for (const o of [...board.children]) { board.remove(o); if (o !== ball && !trail.some(t => t.m === o) && o.geometry !== coinGeo && o.geometry !== bitGeo) o.geometry?.dispose(); }
-    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = []; deeps = []; switches = []; foes = []; winds = []; traps = []; lid = null;
+    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = []; deeps = []; pools = []; switches = []; foes = []; winds = []; traps = []; lid = null;
   }
 
   function load(lv) {
@@ -215,7 +215,7 @@ export function createView(container) {
       if (m.map) { m = m.clone(); m.map = m.map.clone(); m.map.wrapS = m.map.wrapT = THREE.RepeatWrapping; const tile = m === mat.zap ? 0.8 : 1.6; m.map.repeat.set(1 / tile, 1 / tile); m.map.needsUpdate = true; }   // a flat shape's texture coordinates are in board units: one tile each `tile` units
       const g = new THREE.Mesh(roundRect(r.w * U, r.h * U, Math.min(r.w, r.h) * U * 0.25), m); g.rotation.x = -Math.PI / 2; g.position.set(X(r.x + r.w / 2), y, Z(r.y + r.h / 2)); g.receiveShadow = true; board.add(g); return g;
     };
-    for (const p of lv.pools || []) flat(p, mat.pool, 0.01, mat.poolRim);
+    pools = (lv.pools || []).map(p => flat(p, mat.pool, 0.01, mat.poolRim));
     fires = (lv.fires || []).map(f => {   // a vent with a cartoon flame standing on it
       const g = new THREE.Group(); g.position.set(X(f.x), 0, Z(f.y));
       const vent = new THREE.Mesh(new THREE.CylinderGeometry(f.r * U * 0.85, f.r * U, 0.16, 20), mat.vent); vent.position.y = 0.08; vent.receiveShadow = true; g.add(vent);
@@ -270,9 +270,9 @@ export function createView(container) {
     s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
     s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return new THREE.ShapeGeometry(s, 8);
   }
-  function steam(f) {
+  function steam(f, color) {   // puffs that rise and fade (white steam; sparks, in another colour)
     for (let k = 0; k < 10; k++) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.18 + Math.random() * 0.14, 10, 8), mat.steam.clone()); m.position.set(X(f.x) + (Math.random() - 0.5) * 0.5, 0.3, Z(f.y) + (Math.random() - 0.5) * 0.5);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.18 + Math.random() * 0.14, 10, 8), mat.steam.clone()); if (color) m.material.color.set(color); m.position.set(X(f.x) + (Math.random() - 0.5) * 0.5, 0.3, Z(f.y) + (Math.random() - 0.5) * 0.5);
       board.add(m); puffs.push({ m, t: 0, v: 1.2 + Math.random() });
     }
   }
@@ -296,6 +296,12 @@ export function createView(container) {
       if (e.type === 'boom') { const at = e.torch != null ? level.torches[e.torch] : level.fires[e.fire]; steam(at); steam(at); }
       if (e.type === 'cool') { const L = level.lava[e.lava]; steam({ x: L.x + L.w / 2, y: L.y + L.h / 2 }); }
       if (e.type === 'freeze') { const D = level.deep[e.deep]; steam({ x: D.x + D.w / 2, y: D.y + D.h / 2 }); }
+      if (e.type === 'icepool') { const P = level.pools[e.pool]; steam({ x: P.x + P.w / 2, y: P.y + P.h / 2 }); }
+      if (e.type === 'power' && e.via != null) {   // the electricity shows running through the puddle to the switch
+        const P = level.pools[e.via], w = level.switches[e.sw];
+        for (let k = 0; k < 3; k++) steam({ x: P.x + P.w * (0.2 + 0.3 * k), y: P.y + P.h * (0.2 + 0.3 * ((k + 1) % 3)) }, '#FFE35C');
+        steam(w, '#FFE35C');
+      }
     }
     traps.forEach((g, i) => { const at = run.state.trapAt?.[i]; if (at) g.position.set(X(at.x), 0, Z(at.y)); });   // moving traps go where the physics says
     if (lid) lid.visible = run.state.got.size < level.coins.length;
@@ -309,6 +315,7 @@ export function createView(container) {
     });
     mat.lava.uniforms.uTime.value = mat.pool.uniforms.uTime.value = mat.deep.uniforms.uTime.value = clock;
     deeps.forEach((m, i) => { m.material = run.state.frozen?.has(i) ? mat.slick : mat.deep; });
+    pools.forEach((m, i) => { m.material = run.state.iced?.has(i) ? mat.slick : mat.pool; });   // a frozen puddle is ice
     switches.forEach((b, i) => { b.material.emissiveIntensity = run.state.powered?.has(i) ? 1.2 : 0; });
     const zapOn = (run.state.clock || 0) % 4 < 2; for (const m of zapMats) m.emissiveIntensity = zapOn ? 0.22 + 0.12 * Math.sin(clock * 30) : 0;   // on for two seconds, off for two
     foes.forEach((g, i) => { const f = run.state.foes?.[i] || level.enemies[i]; g.position.set(X(f.x), 0.36 + 0.05 * Math.sin(clock * 6 + i), Z(f.y)); g.lookAt(ball.position.x, g.position.y, ball.position.z); });

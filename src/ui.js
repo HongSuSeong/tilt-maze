@@ -3,7 +3,8 @@
 import { T } from './text.js';
 import { DIFFS, BUILT, levelsFor } from './difficulty.js';
 import { isOpen, reachedOf } from './save.js';
-import { ELEMENTS, ownedFor } from './elements.js';
+import { ELEMENTS, FUSIONS, ownedFor } from './elements.js';
+import { canFuse } from './run.js';
 import { COLORS, PATTERNS, THEMES, BOOST_PRICES, paintPalette, nextPaintAt, clears } from './shop.js';
 import { drawBall, drawPreview, DOT_W, DOT_H } from './look.js';
 
@@ -16,7 +17,10 @@ const FLAKE = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true
 const BOLT = '<svg width="26" height="26" viewBox="0 0 24 30" aria-hidden="true"><path d="M14 1 3 17h8l-2 12 12-17h-8z" fill="#FFE35C" stroke="#3B4778" stroke-width="1.8" stroke-linejoin="round"/></svg>';
 const ROCK = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l3-8 6-3 6 4 1 8-6 3H8z" fill="#C9BEB3" stroke="#6E655C" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 10l3 3 5-2" fill="none" stroke="#6E655C" stroke-width="1.2"/></svg>';
 const CLOUD = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6 1.2A3.4 3.4 0 0 0 7 18z" fill="#DDF5C4" stroke="#6AA84F" stroke-width="1.6" stroke-linejoin="round"/></svg>';
-const ICON = { water: DROP('#BFE7FF'), fire: FLAME, ice: FLAKE, spark: BOLT, stone: ROCK, gas: CLOUD };
+const STEAM = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 19h10a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6 1.2A3.4 3.4 0 0 0 7 19z" fill="#F4F9FF" stroke="#7FA3C4" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 6c-1-1.5 1-2.5 0-4M13 6c-1-1.5 1-2.5 0-4" fill="none" stroke="#7FA3C4" stroke-width="1.4" stroke-linecap="round"/></svg>';
+const SNOW = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8" fill="#F7FBFF" stroke="#7FA7C9" stroke-width="1.6"/><circle cx="9" cy="11" r="1.2" fill="#BFD6EA"/><circle cx="14.5" cy="15" r="1.4" fill="#BFD6EA"/><circle cx="14" cy="9.5" r="0.9" fill="#BFD6EA"/></svg>';
+const BLAST = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8l8 2-6 3 7 1-5 4 8-2" fill="#FFE35C" stroke="#E2552E" stroke-width="1.4" stroke-linejoin="round"/><circle cx="16" cy="13" r="6" fill="#FF5A3C" stroke="#7A2410" stroke-width="1.6"/><circle cx="17.5" cy="11.5" r="2.2" fill="#FFD24A"/></svg>';
+const ICON = { water: DROP('#BFE7FF'), fire: FLAME, ice: FLAKE, spark: BOLT, stone: ROCK, gas: CLOUD, steam: STEAM, snow: SNOW, blast: BLAST };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function createUI(root, h) {
@@ -127,17 +131,18 @@ export function createUI(root, h) {
       return `<button data-pick="${el}" aria-pressed="${at >= 0}" aria-label="${ELEMENTS[el].name}${at >= 0 ? `, 칸 ${at + 1}` : ''}">${at >= 0 ? `<i class="nth">${at + 1}</i>` : ''}${ICON[el]}<span>${ELEMENTS[el].name}</span></button>`;
     }).join('')}</div>`;
   }
-  // the slots in the dock: what each holds, how long the coat has left, how long until it can be used again
-  function slots(chosen, coat, cool) {
+  // the slots in the dock: what each holds, how long the coat (or the fusion of both) has left, how long until it can
+  // be used again, and a glow on the one that would fuse with what is worn
+  function slots(chosen, coat, cool, glow = [false, false]) {
     chosen.forEach((el, i) => {
       const b = $('slot' + i), E = el && ELEMENTS[el];
-      b.disabled = !el; b.classList.toggle('has', !!el); b.style.setProperty('--el', E?.color || '');
+      b.disabled = !el; b.classList.toggle('has', !!el); b.style.setProperty('--el', E?.color || ''); b.classList.toggle('fuse', glow[i]);
       b.setAttribute('aria-label', el ? `칸 ${i + 1}: ${E.name}` : `칸 ${i + 1}: ${T.none}`);
-      const wearing = coat && coat.el === el && cool[i] > E?.cool, wait = !wearing && cool[i] > 0;
-      const html = el ? `<span class="fill" style="height:${wearing ? Math.min(1, coat.left / E.dur) * 100 : 0}%"></span><span class="ico">${ICON[el]}${E.name}</span>${wait ? `<span class="wait">${Math.ceil(cool[i])}</span>` : ''}` : '';
+      const wearing = !!coat && (coat.fused ? coat.of.includes(el) : coat.slot === i), wait = !wearing && cool[i] > 0;
+      const html = el ? `<span class="fill" style="height:${wearing ? Math.min(1, coat.left / coat.dur) * 100 : 0}%"></span><span class="ico">${ICON[el]}${E.name}</span>${wait ? `<span class="wait">${Math.ceil(cool[i])}</span>` : ''}` : '';
       if (b.dataset.html !== html) { b.innerHTML = html; b.dataset.html = html; }
     });
-    const any = chosen.some(Boolean); $('slotNote').textContent = any ? T.slotUse : T.slotEmpty;
+    const any = chosen.some(Boolean); $('slotNote').textContent = coat?.fused ? T.fusedNow(FUSIONS[coat.el].name) : glow.some(Boolean) ? T.slotFuse : any ? T.slotUse : T.slotEmpty;
   }
 
   // the dress-up page: a turning ball on top, then the ball's pattern and colours, the dot drawing, or the boost
@@ -164,13 +169,16 @@ export function createUI(root, h) {
         <p class="note">${next ? T.paintMore(next - clears(save)) : T.paintAll}</p>
         <div class="row2"><button id="clearDots">${T.clearAll}</button><button class="go" id="wearDots">${look.mode === 'pixels' && draft.every((c, i) => c === look.pixels[i]) ? T.wearing : T.wear}</button></div>`,
       theme: `<div class="themes">${THEMES.map(t => `<button data-theme="${t.id}" aria-pressed="${save.theme === t.id}"><span class="look ${t.id}" aria-hidden="true"><i></i><i></i><i></i></span><b>${t.name}</b>${save.owned.themes.includes(t.id) ? `<small>${save.theme === t.id ? T.themeOn : T.themeUse}</small>` : price(t.price)}</button>`).join('')}</div>`,
+      book: `<p class="note">${T.bookNote}</p><div class="book">${Object.entries(FUSIONS).map(([id, F]) => (save.found.includes(id)
+        ? `<div class="fusion"><span class="pair">${ICON[F.of[0]]}+${ICON[F.of[1]]}=</span>${ICON[id]}<b>${F.name}</b><small>${F.use}</small></div>`
+        : `<div class="fusion unknown"><span class="pair">${ICON[F.of[0]]}+<i>?</i>=</span><i>?</i><b>???</b><small>${T.bookHint(ELEMENTS[F.of[0]].name)}</small></div>`)).join('')}</div>`,
       boost: `<div class="card flat"><h2>${T.boostName}</h2><p>${T.boostNow(save.boost)}</p>
         ${save.boost < BOOST_PRICES.length ? `<button class="go" id="buyBoost"><span class="coin"></span> ${T.boostNext(save.boost, BOOST_PRICES[save.boost])}</button>` : `<p>${T.boostMax}</p>`}</div>`,
     }[tab];
     $('shop').innerHTML = `<div class="inner">
       <header><button data-do="closeShop">← ${T.back}</button><span class="purse"><span class="coin"></span>${save.coins}</span></header>
       <canvas id="preview" class="preview" width="132" height="132" aria-hidden="true"></canvas>
-      <div class="chips tabs" role="tablist">${[['ball', T.tabBall], ['draw', T.tabDraw], ['theme', T.tabTheme], ['boost', T.tabBoost]].map(([k, n]) => `<button role="tab" data-tab="${k}" aria-pressed="${tab === k}" aria-selected="${tab === k}">${n}</button>`).join('')}</div>
+      <div class="chips tabs" role="tablist">${[['ball', T.tabBall], ['draw', T.tabDraw], ['theme', T.tabTheme], ['boost', T.tabBoost], ['book', T.tabBook]].map(([k, n]) => `<button role="tab" data-tab="${k}" aria-pressed="${tab === k}" aria-selected="${tab === k}">${n}</button>`).join('')}</div>
       <section>${body}</section></div>`;
     const S = $('shop'), on = (sel, f) => { for (const b of S.querySelectorAll(sel)) b.addEventListener('click', () => f(b)); };
     on('[data-do]', b => h[b.dataset.do]());
@@ -237,7 +245,7 @@ export function createUI(root, h) {
       $('hudTime').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
       $('hudBar').style.width = `${Math.max(0, k) * 100}%`; $('hudTrack').classList.toggle('low', k < 0.25);
       $('hudCoins').textContent = run.level.lock ? `${run.state.got.size}/${run.level.coins.length}` : run.coins;   // god: how many of the coins the hole waits for
-      slots(run.slots, run.coat, run.cool);
+      slots(run.slots, run.coat, run.cool, [canFuse(run, 0), canFuse(run, 1)]);
     },
     toast(text) { toastFn(text); },
   };

@@ -136,6 +136,23 @@ try {
   check(await page.getByRole('button', { name: '계속하기' }).isVisible(), 'settings opened from pause close back to it');
   await page.getByRole('button', { name: '계속하기' }).click();
   check(await page.evaluate(() => window.__tm.run.phase) === 'play', 'and play goes on');
+  // fusing: water worn, the fire slot glows; pressed, the two make steam, found the first time with ten coins
+  const coinsBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('tilt-maze:v1')).coins);
+  await page.goto(`http://localhost:${PORT}/tilt-maze/?test&unlock`);
+  await page.locator('.grid button[data-id="w8-3"]').first().click();
+  for (const el of ['stone', 'gas', 'ice', 'spark', 'water', 'fire']) if (await page.locator(`[data-pick="${el}"]`).getAttribute('aria-pressed') === 'true') await page.locator(`[data-pick="${el}"]`).click();
+  for (const el of ['water', 'fire']) await page.locator(`[data-pick="${el}"]`).click();
+  await page.getByRole('button', { name: '시작' }).click();
+  await page.locator('#slot0').dispatchEvent('pointerdown'); await page.waitForTimeout(150);
+  check(await page.locator('#slot1').evaluate(b => b.classList.contains('fuse')), 'with water worn, the fire slot glows');
+  await page.locator('#slot1').dispatchEvent('pointerdown');
+  check(await page.evaluate(() => window.__tm.run.coat?.el) === 'steam', 'pressed, water and fire fuse into steam');
+  check(await page.getByText('새 합체 발견: 증기').isVisible(), 'the first steam is told');
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('tilt-maze:v1')));
+  check(kept.found.includes('steam') && kept.coins === coinsBefore + 10, 'it goes in the book with ten coins');
+  await page.locator('#pauseBtn').click(); await page.getByRole('button', { name: '처음 화면으로' }).click();
+  await page.getByRole('button', { name: /꾸미기/ }).click(); await page.getByRole('tab', { name: '도감' }).click();
+  check(await page.locator('.fusion:not(.unknown)').count() === 1 && await page.locator('.fusion.unknown').count() === 2, 'the book shows steam and two still to find');
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } finally { await browser.close(); srv.kill(); }
 console.log(ok ? 'ALL PASS' : 'FAILED'); process.exitCode = ok ? 0 : 1;

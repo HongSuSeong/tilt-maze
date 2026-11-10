@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultSave, loadSave, writeSave, recordClear, isOpen, markOpened, reachedOf } from '../src/save.js';
+import { defaultSave, loadSave, writeSave, recordClear, isOpen, markOpened, reachedOf, discover } from '../src/save.js';
 import { nextLevel } from '../src/levels/index.js';
 import { levelsFor } from '../src/difficulty.js';
 
@@ -68,4 +68,13 @@ describe('save', () => {
     s.prog.easy.best = allFields(); expect(markOpened(s).opened).toEqual(['easy', 'normal']);
   });
   it('remembers the elements picked for each stage', () => expect(defaultSave().picks).toEqual({}));
+  it('a fusion found the first time goes in the book with ten coins; again, nothing', () => {
+    const s = { ...defaultSave(), coins: 3 }; expect(s.found).toEqual([]);
+    const a = discover(s, 'steam'); expect(a.isNew).toBe(true); expect(a.save.found).toEqual(['steam']); expect(a.save.coins).toBe(13);
+    const b = discover(a.save, 'steam'); expect(b.isNew).toBe(false); expect(b.save).toBe(a.save);
+  });
+  it('an older save starts with an empty book', () => {
+    const st = mem(), old = defaultSave(); delete old.found; st.setItem(KEY, JSON.stringify(old));
+    expect(loadSave(st).found).toEqual([]);
+  });
 });

@@ -59,6 +59,9 @@ button.go:active:not(:disabled) { box-shadow: 0 2px 0 var(--go-edge); }
 .slot .fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--el, #5BB8F5); opacity: .35; pointer-events: none; }
 .slot .wait { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(36, 69, 60, .45); color: #fff; font-size: 20px; pointer-events: none; }
 .slot .ico { display: grid; gap: 1px; place-items: center; position: relative; }
+.slot.fuse { animation: fuse .5s ease-in-out infinite alternate; }   /* pressing it now would fuse */
+@keyframes fuse { from { box-shadow: 0 5px 0 var(--edge), 0 0 0 3px var(--el); } to { box-shadow: 0 5px 0 var(--edge), 0 0 0 7px var(--el), 0 0 18px var(--el); } }
+@media (prefers-reduced-motion: reduce) { .slot.fuse { animation: none; box-shadow: 0 5px 0 var(--edge), 0 0 0 5px var(--el); } }
 .equip { display: flex; gap: 10px; justify-content: center; }
 .equip button { width: 92px; min-height: 64px; padding: 4px; display: grid; gap: 2px; place-items: center; font-size: 13px; }
 .equip button.empty { color: var(--mute); background: var(--soft); }
@@ -135,6 +138,16 @@ button.go:active:not(:disabled) { box-shadow: 0 2px 0 var(--go-edge); }
 .home .note { margin: 0; font-size: 13px; color: var(--mute); text-align: center; }
 
 /* the theme cards: three little strips of what each look is made of */
+.book { display: grid; gap: 10px; }
+.fusion { display: grid; grid-template-columns: auto 34px 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 8px; padding: 10px 12px; border-radius: 18px; background: var(--card); box-shadow: 0 4px 0 var(--edge); }
+.fusion .pair { grid-row: span 2; display: flex; align-items: center; gap: 2px; color: var(--mute); }
+.fusion .pair svg { width: 22px; height: 22px; }
+.fusion > svg, .fusion > i { grid-row: span 2; width: 32px; height: 32px; }
+.fusion i { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--soft); font-style: normal; color: var(--mute); }
+.fusion > i { width: 32px; height: 32px; font-size: 18px; }
+.fusion b { font-weight: 400; font-size: 18px; }
+.fusion small { color: var(--mute); font-size: 13px; line-height: 1.35; }
+.fusion.unknown { opacity: .75; }
 .themes { display: grid; gap: 10px; }
 .themes button { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; text-align: left; min-height: 64px; }
 .themes button[aria-pressed="true"] { outline: 3px solid var(--go); outline-offset: 2px; }

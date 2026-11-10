@@ -8,9 +8,9 @@ import { createMusic } from './music.js';
 import { T } from './text.js';
 import { levelById } from './levels/index.js';
 import { levelsFor } from './difficulty.js';
-import { loadSave, writeSave, markOpened, reachedOf, isOpen } from './save.js';
+import { loadSave, writeSave, markOpened, reachedOf, isOpen, discover } from './save.js';
 import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear, useSlot, setSlots, SKIP_COST } from './run.js';
-import { ownedFor, toggleElement } from './elements.js';
+import { ownedFor, toggleElement, FUSIONS } from './elements.js';
 import { buy, buyBoost, COLORS, PATTERNS, THEMES, BOOST_PRICES } from './shop.js';
 
 let save = loadSave();
@@ -24,7 +24,7 @@ const applyTheme = () => { document.documentElement.dataset.look = save.theme; v
 const theme = () => { document.documentElement.dataset.theme = save.opt.dark ? 'dark' : 'light'; view.setDark(save.opt.dark); };
 
 addEventListener('deviceorientation', e => { if (e.beta != null) tilt.feed(e); });
-addEventListener('keydown', e => { keys[e.key] = true; if ((e.key === '1' || e.key === '2') && run && useSlot(run, +e.key - 1)) { sound.coat(); view.burst(run.coat.el); } });   // number keys stand in for the slots on a computer
+addEventListener('keydown', e => { keys[e.key] = true; if (e.key === '1' || e.key === '2') wear(+e.key - 1); });   // number keys stand in for the slots on a computer
 addEventListener('keyup', e => { keys[e.key] = false; });
 addEventListener('resize', () => view.resize());
 
@@ -35,6 +35,15 @@ async function unlock() {
     try { if (await DeviceOrientationEvent.requestPermission() !== 'granted') notice = T.sensorDenied; } catch { notice = T.sensorDenied; }
   }
   setTimeout(() => { if (!tilt.hasSensor && !notice) { notice = T.noSensor; if (mode === 'home') goHome(); } }, 1500);
+}
+// Press a slot: the ball wears its element, or fuses it with the one worn. A fusion found the first time goes in the book.
+function wear(i) {
+  if (!run || !useSlot(run, i)) return;
+  sound.coat(); const c = run.coat;
+  if (!c.fused) return view.burst(c.el);
+  for (const el of [...c.of, c.el]) view.burst(el);
+  const d = discover(save, c.el);
+  if (d.isNew) { save = d.save; keep(); sound.win(); ui.toast(T.found(FUSIONS[c.el].name)); } else ui.toast(T.fusedNow(FUSIONS[c.el].name));
 }
 async function stayAwake() { try { wake = await navigator.wakeLock?.request('screen'); } catch { wake = null; } }
 
@@ -84,7 +93,7 @@ const ui = createUI(document.body, {
     if (save.coins < price) return ui.toast(T.needCoins(price - save.coins));
     ui.ask(T.askBuy('boost', '', price), null, () => { save = buyBoost(save).save; keep(); sound.win(); ui.show('shop', { save }); });
   },
-  useSlot(i) { if (run && useSlot(run, i)) { sound.coat(); view.burst(run.coat.el); } },
+  useSlot(i) { wear(i); },
   pickElement(el) { setSlots(run, toggleElement(run.slots, el)); ready(); },
 });
 
@@ -138,7 +147,7 @@ if (shot) {
   if (tok.has('normal')) save.diff = 'normal';
   for (const d of ['hard', 'hell', 'god']) if (tok.has(d)) save.diff = d;
   for (const t of ['paper', 'toon']) if (tok.has(t)) { save.theme = t; applyTheme(); }
-  if (shot[1] === 'shop') { save.coins = 128; save.owned.colors.push('sky', 'grape'); mode = 'shop'; ui.show('shop', { save }); for (const t of ['draw', 'theme', 'boost']) if (tok.has(t)) document.querySelector(`[data-tab="${t}"]`).click(); if (tok.has('ask')) document.querySelector('[data-pattern="stars"]').click(); }
+  if (shot[1] === 'shop') { save.coins = 128; save.owned.colors.push('sky', 'grape'); mode = 'shop'; ui.show('shop', { save }); save.found = ['steam']; for (const t of ['draw', 'theme', 'boost', 'book']) if (tok.has(t)) document.querySelector(`[data-tab="${t}"]`).click(); if (tok.has('ask')) document.querySelector('[data-pattern="stars"]').click(); }
   else if (shot[1] === 'home') {
     save.coins = 128; save.prog.easy = { reached: 'w1-10', best: Object.fromEntries(levelsFor('easy').map((l, i) => [l.id, { stars: 1 + i % 3, time: 20 }])) };
     goHome();
@@ -146,7 +155,10 @@ if (shot) {
     load(shot[1]);
     if (s === 'ready') ready();
     else { startRun(run); mode = 'play'; ui.show('play', { level: run.level }); run.left *= 0.7; run.coins = 2; if (tok.has('coat')) { useSlot(run, run.slots[1] ? 1 : 0); run.coat.left = 3.2; }
-      const el = ['water', 'fire', 'ice', 'spark', 'stone', 'gas'].find(e => tok.has(e)); if (el) { run.slots = [el, null]; run.cool = [0, 0]; useSlot(run, 0); run.coat.left = 3.2; } ui.hud(run); }
+      const el = ['water', 'fire', 'ice', 'spark', 'stone', 'gas'].find(e => tok.has(e)); if (el) { run.slots = [el, null]; run.cool = [0, 0]; useSlot(run, 0); run.coat.left = 3.2; }
+      const f = Object.keys(FUSIONS).find(e => tok.has(e)); if (f) { run.slots = [...FUSIONS[f].of]; run.cool = [0, 0]; useSlot(run, 0); useSlot(run, 1); run.coat.left = 3.2; run.coat.kick = false; run.state.snow = 60; }
+      if (tok.has('glow')) { run.slots = ['water', 'fire']; run.cool = [0, 0]; useSlot(run, 0); }   // the slot that would fuse glows
+      ui.hud(run); }
     if (s === 'pause') ui.show('pause');
     if (s === 'clear') { clearOut = { stars: 2, reward: 17, next: levelById('w1-4') }; ui.show('clear', clearOut); }
     if (s === 'fail') ui.show('fail', { reason: run.level.gaps?.length ? 'fall' : run.level.enemies?.length ? 'caught' : run.level.deep?.length ? 'drown' : run.level.lava?.length ? 'lava' : run.level.fires ? 'fire' : tok.has('normal') ? 'trap' : 'timeout' });
