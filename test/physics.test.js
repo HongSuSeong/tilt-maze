@@ -195,4 +195,22 @@ describe('physics', () => {
     const s = fresh(), ev = roll(createBall(30, 80), { x: 8, y: 0 }, 1, lv({ torches: [{ x: 50, y: 80, door: 0 }], walls: [{ x: 58, y: 60, w: 6, h: 40, kind: 'wall' }] }), s, 'gas');
     expect(ev.some(e => e.type === 'boom')).toBe(true); expect(s.broken.has(0)).toBe(true);
   });
+  it('a moving trap goes back and forth between its ends', () => {
+    const level = lv({ traps: [{ x: 30, y: 80, r: 5, to: { x: 70, y: 80 }, period: 4 }] }), s = fresh();
+    s.clock = -1 / 60; const b = createBall(50, 30); stepBall(b, { x: 0, y: 0 }, 1 / 60, level, s, 1);   // the step adds its own sixtieth
+    expect(s.trapAt[0].x).toBeCloseTo(50, 0);   // half way at the start, going one way
+    s.clock = 1 - 1 / 60; stepBall(b, { x: 0, y: 0 }, 1 / 60, level, s, 1); expect(s.trapAt[0].x).toBeCloseTo(70, 0);
+    s.clock = 3 - 1 / 60; stepBall(b, { x: 0, y: 0 }, 1 / 60, level, s, 1); expect(s.trapAt[0].x).toBeCloseTo(30, 0);
+  });
+  it('a ball falls into a moving trap where it is now', () => {
+    const level = lv({ traps: [{ x: 30, y: 80, r: 6, to: { x: 70, y: 80 }, period: 4 }] }), s = fresh(); s.clock = 1 - 1 / 60;
+    const ev = stepBall(createBall(70, 80), { x: 0, y: 0 }, 1 / 60, level, s, 1);
+    expect(ev.some(e => e.type === 'trap')).toBe(true);
+  });
+  it('a locked hole lets the ball roll over it until every coin is taken', () => {
+    const level = lv({ hole: { x: 50, y: 120, r: 7.4 }, lock: true, coins: [{ x: 20, y: 20 }] });
+    const shut = createBall(50, 100); expect(run(shut, { x: 0, y: 10 }, 1, level).some(e => e.type === 'hole')).toBe(false);
+    const s = fresh(); s.got.add(0); const open = createBall(50, 100);
+    expect(run(open, { x: 0, y: 10 }, 1, level, s).some(e => e.type === 'hole')).toBe(true);
+  });
 });

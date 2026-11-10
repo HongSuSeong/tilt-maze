@@ -104,7 +104,7 @@ function frame(now) {
     for (const e of ev) {
       if (e.type === 'knock') sound.knock(e.speed);
       else if (e.type === 'break') sound.crash();
-      else if (e.type === 'coin') sound.ding();
+      else if (e.type === 'coin') { sound.ding(); if (run.level.lock && run.state.got.size === run.level.coins.length) { sound.win(); ui.toast(T.lockOpen); } }
       else if (e.type === 'hole') sound.plop();
       else if (e.type === 'douse' || e.type === 'cool' || e.type === 'freeze') sound.hiss();
       else if (e.type === 'burnwall' || e.type === 'boom') sound.crash();
@@ -133,7 +133,7 @@ if (shot) {
   const tok = new Set(shot[2].split(':').filter(Boolean)), s = ['ready', 'play', 'pause', 'clear', 'fail', 'rest', 'settings'].find(t => tok.has(t)) || 'play';
   if (tok.has('dark')) save.opt.dark = true;
   if (tok.has('normal')) save.diff = 'normal';
-  if (tok.has('hard')) save.diff = 'hard';
+  for (const d of ['hard', 'hell', 'god']) if (tok.has(d)) save.diff = d;
   if (shot[1] === 'shop') { save.coins = 128; save.owned.colors.push('sky', 'grape'); mode = 'shop'; ui.show('shop', { save }); for (const t of ['draw', 'boost']) if (tok.has(t)) document.querySelector(`[data-tab="${t}"]`).click(); if (tok.has('ask')) document.querySelector('[data-pattern="stars"]').click(); }
   else if (shot[1] === 'home') {
     save.coins = 128; save.prog.easy = { reached: 'w1-10', best: Object.fromEntries(levelsFor('easy').map((l, i) => [l.id, { stars: 1 + i % 3, time: 20 }])) };

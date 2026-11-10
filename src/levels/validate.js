@@ -14,7 +14,7 @@ const fits = (x, y, walls) => x >= LO && x <= HIX && y >= LO && y <= HIY && wall
 
 export function validateLevel(level) {
   const err = [], { walls, coins, start, hole } = level, traps = level.traps || [];
-  const inTrap = (x, y) => traps.some(t => Math.hypot(x - t.x, y - t.y) < t.r);
+  const inTrap = (x, y) => traps.some(t => !t.to && Math.hypot(x - t.x, y - t.y) < t.r);   // a moving trap can be passed in time
   // a fire pillar is a wall unless the stage gives water to put it out (or gas to blow it out)
   const fires = (level.kit || []).some(k => k === 'water' || k === 'gas') ? [] : level.fires || [];   // gas blows a pillar out too
   const burns = (x, y) => fires.some(f => Math.hypot(x - f.x, y - f.y) < f.r + R);

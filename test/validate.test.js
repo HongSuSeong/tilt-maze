@@ -80,4 +80,8 @@ describe('validateLevel', () => {
     const o = { walls: [{ x: 3, y: 80, w: 94, h: 6, kind: 'thick' }], fires: [{ x: 50, y: 70, r: 5 }], kit: ['gas'] };
     expect(validateLevel(base(o))).toEqual([]); expect(validateLevel(base({ ...o, kit: [] }))).toContain('구멍에 갈 수 없음');
   });
+  it('a moving trap is not counted as a wall: it can be passed in time', () => {
+    const walls = [{ x: 3, y: 80, w: 40, h: 6, kind: 'wall' }, { x: 57, y: 80, w: 40, h: 6, kind: 'wall' }];
+    expect(validateLevel(base({ walls, traps: [{ x: 50, y: 83, r: 7, to: { x: 50, y: 60 }, period: 3 }] }))).toEqual([]);
+  });
 });

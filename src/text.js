@@ -5,6 +5,8 @@ export const T = {
   stage: l => (l.world === 0 ? `연습 ${l.index}` : `${l.index}단계`),
   continue: '이어하기', settings: '설정', coins: '코인',
   locked: '잠김',
+  lockOpen: '구멍이 열렸어요!',
+  lockHint: '코인을 모두 모아야 구멍이 열려요', moveHint: '움직이는 함정 구멍을 조심하세요',
   readyHold: '폰을 바닥과 수평으로 들고 시작을 누르세요',
   start: '시작', left: '남은 시간',
   slotEmpty: '원소는 물의 세계부터', slotUse: '칸을 누르면 공이 원소를 둘러요', equip: '장착할 원소 (칸을 눌러 바꾸기)', none: '비움', pause: '일시 정지',

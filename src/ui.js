@@ -88,7 +88,7 @@ export function createUI(root, h) {
       case 'home': bars(false); home(d); break;
       case 'ready':
         bars(true); label(d.level);
-        card(`<h2>${esc(d.level.name)}</h2>${d.level.hint ? `<p>${esc(d.level.hint)}</p>` : ''}${equip(d.level, d.slots)}<p>${T.readyHold}</p><button class="go" data-do="start">${T.start}</button>`);
+        card(`<h2>${esc(d.level.name)}</h2>${d.level.hint ? `<p>${esc(d.level.hint)}</p>` : ''}${d.level.lock ? `<p>${T.lockHint}</p>` : d.level.traps?.some(t => t.to) ? `<p>${T.moveHint}</p>` : ''}${equip(d.level, d.slots)}<p>${T.readyHold}</p><button class="go" data-do="start">${T.start}</button>`);
         for (const b of root.querySelectorAll('[data-slot]')) b.addEventListener('click', () => h.cycleSlot(+b.dataset.slot));
         slots(d.slots, null, [0, 0]);
         break;
@@ -229,7 +229,7 @@ export function createUI(root, h) {
       const s = Math.max(0, Math.ceil(run.left)), k = run.left / run.level.time;
       $('hudTime').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
       $('hudBar').style.width = `${Math.max(0, k) * 100}%`; $('hudTrack').classList.toggle('low', k < 0.25);
-      $('hudCoins').textContent = run.coins;
+      $('hudCoins').textContent = run.level.lock ? `${run.state.got.size}/${run.level.coins.length}` : run.coins;   // god: how many of the coins the hole waits for
       slots(run.slots, run.coat, run.cool);
     },
     toast(text) { toastFn(text); },

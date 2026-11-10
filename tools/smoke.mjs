@@ -81,6 +81,7 @@ try {
   // ?unlock opens every built difficulty and stage for a test run, and keeps nothing of it
   await page.goto(`http://localhost:${PORT}/tilt-maze/?test&unlock`);
   check(await page.getByRole('button', { name: '어려움' }).getAttribute('data-locked') === null, 'with ?unlock, hard is open');
+  check(await page.getByRole('button', { name: '신' }).getAttribute('data-locked') === null, 'and so are hell and god');
   await page.getByRole('button', { name: '어려움' }).click();
   check(await page.getByRole('button', { name: /이어하기 · 들판 1/ }).isVisible() && await page.locator('.grid button[data-id="h10-10"]').isEnabled(), 'and every hard stage can be played');
   await page.goto(`http://localhost:${PORT}/tilt-maze/?test`);

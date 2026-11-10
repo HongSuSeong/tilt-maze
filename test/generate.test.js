@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generate } from '../src/levels/generate.js';
+const HELL = levelsFor('hell'), GOD = levelsFor('god');
 import { validateLevel, requires } from '../src/levels/validate.js';
 import { levelsFor, BUILT } from '../src/difficulty.js';
 import { nextLevel, levelById } from '../src/levels/index.js';
@@ -10,7 +11,7 @@ const HARD = levelsFor('hard');
 describe('hard maps', () => {
   it('the same stage comes out the same every time', () => expect(generate(3, 5)).toEqual(generate(3, 5)));
   it('a hundred of them, after the built difficulties', () => {
-    expect(BUILT).toEqual(['easy', 'normal', 'hard']);
+    expect(BUILT).toEqual(['easy', 'normal', 'hard', 'hell', 'god']);
     expect(HARD.map(l => l.id)).toEqual(Array.from({ length: 10 }, (_, w) => Array.from({ length: 10 }, (_, i) => `h${w + 1}-${i + 1}`)).flat());
     expect(nextLevel('h1-10', 'hard').id).toBe('h2-1'); expect(nextLevel('h10-10', 'hard')).toBe(null);
   });
@@ -32,5 +33,23 @@ describe('hard maps', () => {
     const s = defaultSave(); expect(isOpen(s, 'hard')).toBe(false);
     s.prog.normal.best = Object.fromEntries(levelsFor('normal').map(l => [l.id, { stars: 1, time: 30 }]));
     expect(isOpen(s, 'hard')).toBe(true);
+  });
+  it('hell and god: a hundred each, of their own', () => {
+    expect(HELL).toHaveLength(100); expect(GOD).toHaveLength(100);
+    expect(HELL[0].id).toBe('x1-1'); expect(GOD[0].id).toBe('g1-1');
+    expect(HELL[0].walls).not.toEqual(HARD[0].walls); expect(GOD[0].walls).not.toEqual(HELL[0].walls);
+  });
+  it.each([...HELL, ...GOD].map(l => [l.id, l]))('%s passes the check and needs its kit', (id, l) => {
+    expect(validateLevel(l)).toEqual([]);
+    for (const el of l.kit) expect(requires(l, el)).toBe(true);
+  });
+  it('hell sets traps moving; god also locks the hole behind every coin', () => {
+    for (const l of [...HELL, ...GOD]) expect(l.traps.filter(t => t.to).length).toBeGreaterThanOrEqual(2);
+    expect(GOD.every(l => l.lock && l.coins.length >= 3)).toBe(true); expect(HELL.some(l => l.lock)).toBe(false);
+  });
+  it('god opens once every stage of hell is cleared', () => {
+    const s = defaultSave(); s.opened = ['easy', 'normal', 'hard', 'hell'];
+    expect(isOpen(s, 'god')).toBe(false);
+    s.prog.hell.best = Object.fromEntries(HELL.map(l => [l.id, { stars: 1, time: 30 }])); expect(isOpen(s, 'god')).toBe(true);
   });
 });

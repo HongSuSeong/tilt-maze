@@ -19,9 +19,12 @@ function kitFor(world, index) {
   return index % 2 === 0 && second ? [own, second] : [own];
 }
 
-export function generate(world, index) {
-  const rand = rng(world * 7919 + index * 104729 + 17), pick = a => a[Math.floor(rand() * a.length)];
-  const C = 5, Rn = world <= 5 ? 8 : 9, cw = (100 - 2 * B) / C, ch = (160 - 2 * B) / Rn, N = C * Rn;
+// hard, hell and god differ in the grid, the seed, the id, and what they add (moving traps; a hole locked behind the coins)
+const KINDS = { hard: { C: 5, rows: w => (w <= 5 ? 8 : 9), id: 'h', salt: 0 }, hell: { C: 6, rows: () => 9, id: 'x', salt: 1 }, god: { C: 6, rows: () => 10, id: 'g', salt: 2 } };
+
+export function generate(world, index, diff = 'hard') {
+  const K = KINDS[diff], rand = rng(world * 7919 + index * 104729 + 17 + K.salt * 7777777), pick = a => a[Math.floor(rand() * a.length)];
+  const C = K.C, Rn = K.rows(world), cw = (100 - 2 * B) / C, ch = (160 - 2 * B) / Rn, N = C * Rn;
   const col = c => c % C, row = c => Math.floor(c / C);
   const center = c => ({ x: B + (col(c) + 0.5) * cw, y: B + (row(c) + 0.5) * ch });
   const neighbours = c => [c - C, c + C, col(c) > 0 ? c - 1 : -1, col(c) < C - 1 ? c + 1 : -1].filter(n => n >= 0 && n < N);
@@ -67,7 +70,7 @@ export function generate(world, index) {
     const el = kit[Math.floor(k / each)], c = path[at], next = path[at + 1], prev = path[at - 1];
     if (el === 'water') { if (kit.includes('gas') || rand() < 0.4) o.lava.push(floor(c)); else o.fires.push({ ...center(c), r: 6 }); }
     if (el === 'fire') {
-      const how = rand();
+      const how = kit.includes('gas') ? rand() * 0.6 : rand();   // with gas about, no torch: a blast beside it would open the door without fire
       if (how < 0.4) walls.push(plug(c, next, V));
       else if (how < 0.6) walls.push(plug(c, next, I));
       else { o.torches.push({ ...center(c), door: walls.length }); walls.push(plug(c, next, D)); }
@@ -97,13 +100,32 @@ export function generate(world, index) {
   }
   const coins = [...Array(N).keys()].filter(c => !onPath.has(c) && !trapCells.includes(c)).filter(() => rand() < 0.35).slice(0, 4).map(center);
   coins.push(center(path[Math.floor(L / 2)]));
+  if (diff === 'god') for (let k = 1; coins.length < 3; k++) coins.push(center(path[Math.floor(L * k / 4)]));   // something to gather before the hole opens
+
+  // hell and god: traps that go back and forth along straight stretches of the way (two to four), timed to be passed
+  if (diff !== 'hard') {
+    const dir = k => path[k + 1] - path[k], runs = [];
+    for (let k = 1; k < L - 2; ) {
+      let m = k; while (m + 1 < L - 1 && dir(m) === dir(k)) m++;
+      if (m - k >= 1 && ![...Array(m - k + 1).keys()].some(j => used.has(k + j))) runs.push([k, m]);
+      k = m + 1;
+    }
+    runs.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]));
+    const want = 2 + Math.floor(world / 4);
+    for (const [a, b] of runs.slice(0, want)) traps.push({ ...center(path[a]), r: 4.5, to: center(path[b]), period: 3 + rand() * 1.6 });
+    for (let c = 0; traps.filter(t => t.to).length < 2 && c < N; c++) {   // few straight stretches: set one going off the way
+      const n = links(c).find(n => !onPath.has(c) && !onPath.has(n) && !trapCells.includes(c) && !trapCells.includes(n));
+      if (n != null) traps.push({ ...center(c), r: 4.5, to: center(n), period: 3.5 });
+    }
+  }
 
   return {
-    id: `h${world}-${index}`, world, index, name: `${NAMES[world]} ${index}`, kit, path: L,
-    time: Math.max(20, Math.min(90, Math.round(L * 2.4 + total * 2 + 8))),
+    id: `${K.id}${world}-${index}`, world, index, name: `${NAMES[world]} ${index}`, kit, path: L,
+    time: Math.max(20, Math.min(120, Math.round((L * 2.4 + total * 2 + 8) * (diff === 'hard' ? 1 : 0.85) + (diff === 'god' ? coins.length * 4 : 0)))),
+    ...(diff === 'god' && { lock: true }),
     start: center(0), hole: { ...center(end), r: 7.4 }, walls, coins, traps, ...o, ...(world === 9 && { dim: true }),
   };
 }
 
-let HARD = null;
-export const hardLevels = () => (HARD ??= Array.from({ length: 10 }, (_, w) => Array.from({ length: 10 }, (_, i) => generate(w + 1, i + 1))).flat());
+const MADE = {};
+export const madeLevels = diff => (MADE[diff] ??= Array.from({ length: 10 }, (_, w) => Array.from({ length: 10 }, (_, i) => generate(w + 1, i + 1, diff))).flat());

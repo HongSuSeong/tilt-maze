@@ -125,7 +125,7 @@ export function createView(container) {
   const lamp = new THREE.PointLight('#fff2dd', 0, 5.5, 1.6); lamp.castShadow = false;   // in the dark, the ball carries the only light
   const trail = Array.from({ length: 24 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(R * U * 0.7, 12, 8), mat.trail.clone()); m.visible = false; return { m, t: 9 }; });
   const bitGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16), coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 28);
-  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], switches = [], foes = [], winds = [], trailI = 0, dark = false, clock = 0;
+  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
 
   function paint() {
@@ -147,7 +147,7 @@ export function createView(container) {
 
   function clear() {
     for (const o of [...board.children]) { board.remove(o); if (o !== ball && !trail.some(t => t.m === o) && o.geometry !== coinGeo && o.geometry !== bitGeo) o.geometry?.dispose(); }
-    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = []; deeps = []; switches = []; foes = []; winds = [];
+    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = []; deeps = []; switches = []; foes = []; winds = []; traps = []; lid = null;
   }
 
   function load(lv) {
@@ -158,11 +158,21 @@ export function createView(container) {
     walls = lv.walls.map(w => block(w, WALL_MAT[w.kind] || mat.wall));
     coins = lv.coins.map(c => { const m = new THREE.Mesh(coinGeo, mat.coin); m.rotation.z = Math.PI / 2; m.position.set(X(c.x), 0.45, Z(c.y)); m.castShadow = true; board.add(m); return m; });
     // the goal wears a mint ring; trap holes an orange-red one
-    for (const [h, ringMat] of [[lv.hole, mat.ring], ...(lv.traps || []).map(t => [t, mat.trap])]) {
-      const hole = new THREE.Mesh(new THREE.CircleGeometry(h.r * U, 40), mat.hole);
-      hole.rotation.x = -Math.PI / 2; hole.position.set(X(h.x), 0.008, Z(h.y)); board.add(hole);
-      const lip = new THREE.Mesh(new THREE.TorusGeometry(h.r * U + 0.04, 0.07, 10, 40), mat.lip); lip.rotation.x = Math.PI / 2; lip.position.copy(hole.position); board.add(lip);
-      const ring = new THREE.Mesh(new THREE.RingGeometry(h.r * U + 0.12, h.r * U + 0.3, 40), ringMat); ring.rotation.x = -Math.PI / 2; ring.position.set(X(h.x), 0.006, Z(h.y)); board.add(ring);
+    const well = (h, ringMat) => {   // a hole: dark inside, a lip, a coloured ring; in a group so a moving trap can carry it
+      const g = new THREE.Group(); g.position.set(X(h.x), 0, Z(h.y));
+      const hole = new THREE.Mesh(new THREE.CircleGeometry(h.r * U, 40), mat.hole); hole.rotation.x = -Math.PI / 2; hole.position.y = 0.008; g.add(hole);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(h.r * U + 0.04, 0.07, 10, 40), mat.lip); lip.rotation.x = Math.PI / 2; lip.position.y = 0.008; g.add(lip);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(h.r * U + 0.12, h.r * U + 0.3, 40), ringMat); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.006; g.add(ring);
+      board.add(g); return g;
+    };
+    well(lv.hole, mat.ring);
+    traps = (lv.traps || []).map(t => well(t, mat.trap));
+    lid = null;
+    if (lv.lock) {   // god: a lid with a coin on it until every coin is taken
+      lid = new THREE.Group(); lid.position.set(X(lv.hole.x), 0, Z(lv.hole.y));
+      const plate = new THREE.Mesh(new THREE.CylinderGeometry(lv.hole.r * U + 0.12, lv.hole.r * U + 0.16, 0.1, 32), mat.thick); plate.position.y = 0.05; plate.castShadow = true; lid.add(plate);
+      const badge = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 24), mat.coin); badge.position.y = 0.13; lid.add(badge);
+      board.add(lid);
     }
     for (const p of lv.pools || []) {
       const m = new THREE.Mesh(roundRect(p.w * U, p.h * U, Math.min(p.w, p.h) * U * 0.45), mat.pool); m.rotation.x = -Math.PI / 2; m.position.set(X(p.x + p.w / 2), 0.01, Z(p.y + p.h / 2)); m.receiveShadow = true; board.add(m);
@@ -248,6 +258,8 @@ export function createView(container) {
       if (e.type === 'cool') { const L = level.lava[e.lava]; steam({ x: L.x + L.w / 2, y: L.y + L.h / 2 }); }
       if (e.type === 'freeze') { const D = level.deep[e.deep]; steam({ x: D.x + D.w / 2, y: D.y + D.h / 2 }); }
     }
+    traps.forEach((g, i) => { const at = run.state.trapAt?.[i]; if (at) g.position.set(X(at.x), 0, Z(at.y)); });   // moving traps go where the physics says
+    if (lid) lid.visible = run.state.got.size < level.coins.length;
     lavas.forEach((p, i) => {
       const cold = run.state.cooled?.has(i); p.m.material = cold ? mat.stone : mat.lava;
       for (const B of p.bubbles) {   // a bubble swells for a while, bursts, and comes up somewhere else

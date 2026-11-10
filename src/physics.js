@@ -94,9 +94,16 @@ export function stepBall(ball, tilt, dt, level, state, sens, coat = null) {
   level.coins.forEach((c, i) => {
     if (!state.got.has(i) && Math.hypot(ball.x - c.x, ball.y - c.y) < R + 3) { state.got.add(i); ev.push({ type: 'coin', coin: i }); }
   });
-  // the goal and any trap holes: the nearest one that has the ball takes it; each rim pulls the ball in a little
-  const wells = (level.traps || []).map((t, i) => ({ ...t, goal: false, i }));
-  if (level.hole) wells.push({ ...level.hole, goal: true });
+  // the goal and any trap holes: the nearest one that has the ball takes it; each rim pulls the ball in a little.
+  // A trap with `to` goes back and forth between where it is and there, once each `period` seconds. A locked goal
+  // (god) stays shut under its lid until every coin is taken.
+  state.trapAt = (level.traps || []).map(t => {
+    if (!t.to) return t;
+    const u = (Math.sin(2 * Math.PI * state.clock / t.period) + 1) / 2;
+    return { ...t, x: t.x + (t.to.x - t.x) * u, y: t.y + (t.to.y - t.y) * u };
+  });
+  const wells = state.trapAt.map((t, i) => ({ ...t, goal: false, i }));
+  if (level.hole && !(level.lock && state.got.size < level.coins.length)) wells.push({ ...level.hole, goal: true });
   let take = null, near = Infinity;
   for (const w of wells) {
     const d = Math.hypot(ball.x - w.x, ball.y - w.y);
