@@ -64,14 +64,20 @@ const ui = createUI(document.body, {
   closeShop() { goHome(); },
   setLook(patch) { save = { ...save, look: { ...save.look, ...patch } }; keep(); view.setLook(save.look); ui.show('shop', { save }); },
   buyOrUse(kind, id, slot) {   // a thing owned is put on; one not owned is bought first, if the coins are there
-    if (!save.owned[kind].includes(id)) {
-      const out = buy(save, kind, id), item = (kind === 'colors' ? COLORS : PATTERNS).find(x => x.id === id);
-      if (!out.ok) return ui.toast(T.needCoins(item.price - save.coins));
-      save = out.save; ui.toast(T.bought(item.name)); sound.ding();
-    }
-    this.setLook(kind === 'patterns' ? { mode: 'pattern', pattern: id } : { [slot]: id });
+    const patch = kind === 'patterns' ? { mode: 'pattern', pattern: id } : { [slot]: id };
+    if (save.owned[kind].includes(id)) return this.setLook(patch);
+    const item = (kind === 'colors' ? COLORS : PATTERNS).find(x => x.id === id);
+    if (save.coins < item.price) return ui.toast(T.needCoins(item.price - save.coins));
+    ui.ask(T.askBuy(kind, item.name, item.price), { ...save.look, ...patch }, () => {
+      save = buy(save, kind, id).save; ui.toast(T.bought(item.name)); sound.ding(); this.setLook(patch);
+    });
   },
-  buyBoost() { const out = buyBoost(save); if (!out.ok) return ui.toast(T.needCoins(BOOST_PRICES[save.boost] - save.coins)); save = out.save; keep(); sound.win(); ui.show('shop', { save }); },
+  buyBoost() {
+    const price = BOOST_PRICES[save.boost];
+    if (price == null) return;
+    if (save.coins < price) return ui.toast(T.needCoins(price - save.coins));
+    ui.ask(T.askBuy('boost', '', price), null, () => { save = buyBoost(save).save; keep(); sound.win(); ui.show('shop', { save }); });
+  },
   useSlot(i) { if (run && useSlot(run, i)) sound.coat(); },
   cycleSlot(i) {   // empty → each owned element → empty
     const opts = [null, ...ownedFor(run.level.world)], next = opts[(opts.indexOf(run.slots[i]) + 1) % opts.length], sl = [...run.slots];
@@ -128,7 +134,7 @@ if (shot) {
   if (tok.has('dark')) save.opt.dark = true;
   if (tok.has('normal')) save.diff = 'normal';
   if (tok.has('hard')) save.diff = 'hard';
-  if (shot[1] === 'shop') { save.coins = 128; save.owned.colors.push('sky', 'grape'); mode = 'shop'; ui.show('shop', { save }); for (const t of ['draw', 'boost']) if (tok.has(t)) document.querySelector(`[data-tab="${t}"]`).click(); }
+  if (shot[1] === 'shop') { save.coins = 128; save.owned.colors.push('sky', 'grape'); mode = 'shop'; ui.show('shop', { save }); for (const t of ['draw', 'boost']) if (tok.has(t)) document.querySelector(`[data-tab="${t}"]`).click(); if (tok.has('ask')) document.querySelector('[data-pattern="stars"]').click(); }
   else if (shot[1] === 'home') {
     save.coins = 128; save.prog.easy = { reached: 'w1-10', best: Object.fromEntries(levelsFor('easy').map((l, i) => [l.id, { stars: 1 + i % 3, time: 20 }])) };
     goHome();

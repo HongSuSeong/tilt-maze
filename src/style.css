@@ -56,6 +56,7 @@ button.go:active:not(:disabled) { box-shadow: 0 2px 0 var(--go-edge); }
 .scrim { position: fixed; inset: 0; background: var(--scrim); display: grid; align-items: end; justify-items: center;
   padding: 24px max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 20px) max(16px, env(safe-area-inset-left, 0px)); }
 .scrim.clear-bg { background: transparent; pointer-events: none; }
+.scrim.ask { align-items: center; z-index: 20; }
 .scrim.clear-bg .card { pointer-events: auto; }
 .card { width: min(380px, 100%); background: var(--card); border-radius: 28px; box-shadow: 0 8px 0 var(--edge); padding: 24px 20px 20px; display: grid; gap: 14px; text-align: center; }
 .card h2 { margin: 0; font-weight: 400; font-size: 26px; text-wrap: balance; }

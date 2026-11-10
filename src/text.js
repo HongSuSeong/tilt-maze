@@ -13,6 +13,8 @@ export const T = {
   fail: { timeout: '시간이 다 됐어요', trap: '함정 구멍에 빠졌어요', fire: '불기둥에 닿았어요', lava: '용암에 빠졌어요', drown: '깊은 물에 빠졌어요', shock: '전기에 감전됐어요', caught: '적에게 잡혔어요', fall: '틈으로 떨어졌어요' }, quench: '물에 닿아 불이 꺼졌어요',
   dress: '꾸미기', back: '처음 화면', tabBall: '공', tabDraw: '그리기', tabBoost: '강화',
   modePattern: '무늬', modePixels: '내 그림', pattern: '무늬', base: '바탕색', accent: '무늬색',
+  askBuy: (kind, name, p) => (kind === 'patterns' ? `${name} 무늬를 코인 ${p}개로 살까요?` : kind === 'colors' ? `${name} 색을 코인 ${p}개로 살까요?` : `원소 오래 두르기를 코인 ${p}개로 올릴까요?`),
+  buy: '사기', cancel: '취소',
   needCoins: n => `코인이 ${n}개 더 필요해요`, bought: name => `${name}을(를) 샀어요`,
   paintMore: n => `단계를 ${n}개 더 깨면 새 색이 열려요`, paintAll: '모든 색이 열렸어요', eraser: '지우개', clearAll: '모두 지우기', wear: '이 그림 입히기', wearing: '지금 입은 그림',
   boostName: '원소 오래 두르기', boostNow: n => `지금: 원소마다 ${5 + n}초`, boostNext: (n, p) => `+1초 (${p} 코인)`, boostMax: '가장 높은 단계예요',

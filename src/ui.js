@@ -36,6 +36,7 @@ export function createUI(root, h) {
     <div class="scrim" id="scrim" hidden><div class="card" id="card"></div></div>
     <div class="home" id="home" hidden></div>
     <div class="home" id="shop" hidden></div>
+    <div class="scrim ask" id="ask" hidden><div class="card" id="askCard" role="dialog" aria-modal="true"></div></div>
     <div class="sheet" id="sheet" hidden></div>
     <div class="toast" id="toast" hidden></div>`);
   const $ = id => root.querySelector('#' + id);
@@ -142,7 +143,9 @@ export function createUI(root, h) {
     stopSpin(); drawBall(skin, look); const c = root.querySelector('#preview'); if (!c) return;
     const t0 = performance.now(), go = now => { drawPreview(c, skin, (now - t0) / 1400); spinRaf = requestAnimationFrame(go); }; spinRaf = requestAnimationFrame(go);
   }
+  let shown = null;
   function shop(save) {
+    shown = save;
     const look = save.look, hexOf = id => COLORS.find(x => x.id === id).hex; draft ??= [...look.pixels];   // an empty cell shows the ball's own colour
     const owned = (k, id) => save.owned[k].includes(id), price = p => `<small class="price"><span class="coin"></span>${p}</small>`;
     const swatches = slot => COLORS.map(c => `<button class="sw" data-color="${c.id}" data-slot="${slot}" aria-pressed="${look[slot] === c.id}" aria-label="${c.name}${owned('colors', c.id) ? '' : `, ${c.price} 코인`}" style="--sw:${c.hex}">${owned('colors', c.id) ? '' : price(c.price)}</button>`).join('');
@@ -185,6 +188,16 @@ export function createUI(root, h) {
     spinPreview(tab === 'draw' ? { ...look, mode: 'pixels', pixels: draft } : look);
   }
 
+  // a purchase asks first; meanwhile the turning ball wears what is being bought
+  function ask(text, tryLook, yes) {
+    $('askCard').innerHTML = `<h2>${esc(text)}</h2><div class="row"><button id="askNo">${T.cancel}</button><button class="go" id="askYes">${T.buy}</button></div>`;
+    $('ask').hidden = false; if (tryLook) spinPreview(tryLook);
+    const done = ok => { $('ask').hidden = true; if (ok) yes(); else if (shown) shop(shown); };
+    $('askCard').querySelector('#askNo').addEventListener('click', () => done(false));
+    $('askCard').querySelector('#askYes').addEventListener('click', () => done(true));
+    $('askCard').querySelector('#askYes').focus();
+  }
+
   function rest(left, canSkip) {
     const el = root.querySelector('#restLeft'); if (!el) return;
     el.textContent = T.restLeft(Math.ceil(left)); root.querySelector('#skipBtn').disabled = !canSkip;
@@ -210,6 +223,7 @@ export function createUI(root, h) {
   return {
     show,
     rest,
+    ask,
     closeSettings() { $('sheet').hidden = true; },
     hud(run) {
       const s = Math.max(0, Math.ceil(run.left)), k = run.left / run.level.time;

@@ -91,6 +91,10 @@ try {
   await page.goto(`http://localhost:${PORT}/tilt-maze/?test`);
   await page.getByRole('button', { name: '꾸미기' }).click();
   await page.getByRole('button', { name: /체크/ }).click();
+  check(await page.getByText('체크 무늬를 코인 20개로 살까요?').isVisible(), 'buying asks first');
+  await page.getByRole('button', { name: '취소' }).click();
+  check((await page.locator('#shop .purse').textContent()).trim() === '100', 'and cancelling keeps the coins');
+  await page.getByRole('button', { name: /체크/ }).click(); await page.getByRole('button', { name: '사기' }).click();
   check((await page.locator('#shop .purse').textContent()).trim() === '80', 'buying the check pattern takes 20 coins');
   await page.getByRole('tab', { name: '그리기' }).click();
   const cell = page.locator('#dots i').nth(20), box = await cell.boundingBox();
