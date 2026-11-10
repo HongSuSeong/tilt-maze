@@ -60,4 +60,8 @@ describe('elements', () => {
     const b = createRun(L({ world: 7 })); setSlots(b, ['gas', null]); startRun(b); useSlot(b, 0); play(b, { x: 12, y: 0 }, 1.5);
     expect(b.phase).toBe('play'); expect(b.coat).toBe(null);
   });
+  it('a boost keeps each element on a second longer per step', () => {
+    const r = createRun(L()); r.boost = 2; startRun(r); useSlot(r, 0);
+    expect(r.coat.left).toBe(7); expect(r.cool[0]).toBe(10);
+  });
 });

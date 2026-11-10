@@ -19,7 +19,8 @@ export function setSlots(run, slots) { run.slots = [...slots]; }
 export function useSlot(run, i) {
   const el = run.slots[i];
   if (run.phase !== 'play' || !el || run.cool[i] > 0) return false;
-  run.coat = { el, left: ELEMENTS[el].dur }; run.cool[i] = ELEMENTS[el].dur + ELEMENTS[el].cool;
+  const dur = ELEMENTS[el].dur + (run.boost || 0);   // the shop's boost: a second longer a step
+  run.coat = { el, left: dur }; run.cool[i] = dur + ELEMENTS[el].cool;
   return true;
 }
 export function startRun(run) { if (run.phase === 'ready') run.phase = 'play'; }
