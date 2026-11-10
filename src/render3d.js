@@ -280,7 +280,7 @@ export function createView(container) {
     ball.position.set(X(b.x), R * U - sink * R * U * 2.4, Z(b.y)); ball.scale.setScalar(1 - sink * 0.3); ball.visible = b.fall < 0.9;
     coat.visible = false; lamp.position.set(ball.position.x, 1.4, ball.position.z);
     ball.scale.multiplyScalar(aura.update(run, ball, dt, clock));   // the element's shape round the ball, and its little bounce when put on
-    if (run.coat?.el === 'stone' && aura.group.children.some(f => f.visible)) ball.visible = false;   // inside the rock
+    if (aura.wearing) ball.visible = false;   // the ball has become the element
     if (sp > FEEL.brk && b.fall === 0) { const t = trail[trailI++ % trail.length]; t.t = 0; t.m.position.copy(ball.position); t.m.visible = true; }
     for (const t of trail) if (t.m.visible) { t.t += dt; t.m.material.opacity = Math.max(0, 0.55 * (1 - t.t / 0.28)); t.m.scale.setScalar(Math.max(0.05, 1 - t.t * 2)); if (t.t > 0.28) t.m.visible = false; }
     for (let i = bits.length - 1; i >= 0; i--) {
