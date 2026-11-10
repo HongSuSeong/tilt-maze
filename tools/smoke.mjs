@@ -86,6 +86,20 @@ try {
   await page.goto(`http://localhost:${PORT}/tilt-maze/?test`);
   check(await page.getByRole('button', { name: '어려움' }).getAttribute('data-locked') === '1', 'without it, hard is locked again');
   check(await page.getByRole('button', { name: '쉬움' }).getAttribute('aria-pressed') === 'true' || await page.getByRole('button', { name: '보통' }).getAttribute('aria-pressed') === 'true', 'and a locked difficulty is not left chosen');
+  // the dress-up page: buy a pattern with coins, wear it, draw on the ball, and keep it all after a reload
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('tilt-maze:v1')); s.coins = 100; localStorage.setItem('tilt-maze:v1', JSON.stringify(s)); });
+  await page.goto(`http://localhost:${PORT}/tilt-maze/?test`);
+  await page.getByRole('button', { name: '꾸미기' }).click();
+  await page.getByRole('button', { name: /체크/ }).click();
+  check((await page.locator('#shop .purse').textContent()).trim() === '80', 'buying the check pattern takes 20 coins');
+  await page.getByRole('tab', { name: '그리기' }).click();
+  const cell = page.locator('#dots i').nth(20), box = await cell.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down(); await page.mouse.up();
+  await page.getByRole('button', { name: '이 그림 입히기' }).click();
+  await page.reload();
+  const look = await page.evaluate(() => JSON.parse(localStorage.getItem('tilt-maze:v1')).look);
+  check(look.mode === 'pixels' && look.pixels[20] === 'ink', 'the drawing is worn and kept');
+  check((await page.evaluate(() => JSON.parse(localStorage.getItem('tilt-maze:v1')).owned.patterns)).includes('check'), 'and the pattern stays bought');
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } finally { await browser.close(); srv.kill(); }
 console.log(ok ? 'ALL PASS' : 'FAILED'); process.exitCode = ok ? 0 : 1;

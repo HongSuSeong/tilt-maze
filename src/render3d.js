@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { FEEL } from './feel.js';
+import { drawBall } from './look.js';
 
 const { BW, BH, RIM, R } = FEEL;
 const U = 0.1, WALL_H = 1.0, BAR_TOP = 92, BAR_BOTTOM = 92, VIEW_DEG = 62;
@@ -39,11 +40,11 @@ const crackTex = p => canvasTex(256, 64, (g, w, h) => {
   g.fillStyle = p.crack; g.fillRect(0, 0, w, h); g.strokeStyle = p.crackLine; g.lineWidth = 5;
   for (let x = -40; x < w + 40; x += 34) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 12, h * 0.45); g.lineTo(x + 2, h); g.stroke(); }
 });
-const ballTex = () => canvasTex(512, 256, (g, w, h) => {   // coral with cream dots, so its rolling shows
-  g.fillStyle = '#FF6E5E'; g.fillRect(0, 0, w, h); g.fillStyle = '#FFF1DC';
-  for (let i = 0; i < 14; i++) { g.beginPath(); g.arc((i * 97) % w, 30 + ((i * 53) % (h - 60)), 16, 0, 7); g.fill(); }
-  g.fillStyle = '#FFA396'; g.fillRect(0, h / 2 - 6, w, 12);
-});
+const ballTex = look => {   // the player's look (see look.js); a pattern shows the ball rolling
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256; drawBall(c, look);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+};
+const LOOK0 = { mode: 'pattern', pattern: 'dots', base: 'coral', accent: 'cream', pixels: [] };
 
 // Lava in the soft-toy look: a glossy orange jelly with pale round blobs drifting slowly across it and a soft sheen,
 // smooth low-frequency noise only, so it sits with the rounded blocks rather than looking like real rock.
@@ -86,7 +87,7 @@ export function createView(container) {
     wall: new THREE.MeshStandardMaterial({ roughness: 0.55 }), crack: new THREE.MeshStandardMaterial({ roughness: 0.6, emissive: '#FF9A55', emissiveIntensity: 0 }),
     hole: new THREE.MeshBasicMaterial(), lip: new THREE.MeshStandardMaterial({ roughness: 0.5 }), ring: new THREE.MeshBasicMaterial(), trap: new THREE.MeshBasicMaterial(),
     coin: new THREE.MeshStandardMaterial({ color: '#FFD34E', metalness: 0.05, roughness: 0.35, emissive: '#E0A100' }),
-    ball: new THREE.MeshStandardMaterial({ map: ballTex(), roughness: 0.32 }),
+    ball: new THREE.MeshStandardMaterial({ map: ballTex(LOOK0), roughness: 0.32 }),
     trail: new THREE.MeshBasicMaterial({ color: '#FF9A55', transparent: true, depthWrite: false }),
     pool: new THREE.MeshStandardMaterial({ color: '#8FD3FF', roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.8 }),
     vent: new THREE.MeshStandardMaterial({ color: '#8B5A48', roughness: 0.8 }),
@@ -299,8 +300,9 @@ export function createView(container) {
   }
 
   function setDark(on) { dark = !!on; paint(); }
+  function setLook(look) { mat.ball.map?.dispose(); mat.ball.map = ballTex(look); mat.ball.needsUpdate = true; }
   function destroy() { clear(); renderer.dispose(); renderer.domElement.remove(); }
 
   paint(); resize();
-  return { load, update, setDark, resize, destroy };
+  return { load, update, setDark, setLook, resize, destroy };
 }

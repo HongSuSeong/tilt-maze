@@ -4,6 +4,8 @@ import { T } from './text.js';
 import { DIFFS, BUILT, levelsFor } from './difficulty.js';
 import { isOpen, reachedOf } from './save.js';
 import { ELEMENTS, ownedFor } from './elements.js';
+import { COLORS, PATTERNS, BOOST_PRICES, paintPalette, nextPaintAt, clears } from './shop.js';
+import { drawBall, drawPreview, DOT_W, DOT_H } from './look.js';
 
 const STAR = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.6l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z" fill="${on ? 'var(--star)' : 'var(--star-off)'}" stroke="${on ? '#E9A91A' : 'none'}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
 const PAUSE = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/></svg>';
@@ -33,6 +35,7 @@ export function createUI(root, h) {
     </div>
     <div class="scrim" id="scrim" hidden><div class="card" id="card"></div></div>
     <div class="home" id="home" hidden></div>
+    <div class="home" id="shop" hidden></div>
     <div class="sheet" id="sheet" hidden></div>
     <div class="toast" id="toast" hidden></div>`);
   const $ = id => root.querySelector('#' + id);
@@ -65,7 +68,8 @@ export function createUI(root, h) {
       <header><h1>${T.title}</h1><span class="purse"><span class="coin"></span>${save.coins}</span></header>
       ${notice ? `<p class="notice">${esc(notice)}</p>` : ''}${unlock ? `<p class="notice">${T.unlockNote}</p>` : ''}
       <div class="chips" role="group" aria-label="${T.diffPick}">${DIFFS.map(chip).join('')}</div>
-      <div class="row2"><button class="go" data-id="${ls[at].id}">${T.continue} · ${esc(ls[at].name)}</button><button data-do="openSettings">${T.settings}</button></div>
+      <button class="go" data-id="${ls[at].id}">${T.continue} · ${esc(ls[at].name)}</button>
+      <div class="row2 halves"><button data-do="openShop">${T.dress}</button><button data-do="openSettings">${T.settings}</button></div>
       ${worlds.map(group).join('')}
     </div>`;
     for (const b of $('home').querySelectorAll('[data-id]')) b.addEventListener('click', () => h.play(b.dataset.id));
@@ -73,12 +77,12 @@ export function createUI(root, h) {
       if (b.dataset.locked) return toastFn(BUILT.includes(b.dataset.diff) ? T.diffLocked : T.diffSoon);
       h.pickDiff(b.dataset.diff);
     });
-    $('home').querySelector('[data-do]').addEventListener('click', h.openSettings);
+    for (const b of $('home').querySelectorAll('[data-do]')) b.addEventListener('click', () => h[b.dataset.do]());
     $('home').hidden = false;
   }
 
   function show(screen, d = {}) {
-    if (screen !== 'settings') { $('scrim').hidden = true; $('home').hidden = true; $('hint').hidden = true; }
+    if (screen !== 'settings') { $('scrim').hidden = true; $('home').hidden = true; $('shop').hidden = true; $('hint').hidden = true; stopSpin(); }
     switch (screen) {
       case 'home': bars(false); home(d); break;
       case 'ready':
@@ -106,6 +110,7 @@ export function createUI(root, h) {
         rest(d.left, d.canSkip);
         break;
       case 'settings': settings(d.opt); break;
+      case 'shop': bars(false); shop(d.save); break;
     }
   }
 
@@ -123,10 +128,61 @@ export function createUI(root, h) {
       b.disabled = !el; b.classList.toggle('has', !!el); b.style.setProperty('--el', E?.color || '');
       b.setAttribute('aria-label', el ? `칸 ${i + 1}: ${E.name}` : `칸 ${i + 1}: ${T.none}`);
       const wearing = coat && coat.el === el && cool[i] > E?.cool, wait = !wearing && cool[i] > 0;
-      const html = el ? `<span class="fill" style="height:${wearing ? (coat.left / E.dur) * 100 : 0}%"></span><span class="ico">${ICON[el]}${E.name}</span>${wait ? `<span class="wait">${Math.ceil(cool[i])}</span>` : ''}` : '';
+      const html = el ? `<span class="fill" style="height:${wearing ? Math.min(1, coat.left / E.dur) * 100 : 0}%"></span><span class="ico">${ICON[el]}${E.name}</span>${wait ? `<span class="wait">${Math.ceil(cool[i])}</span>` : ''}` : '';
       if (b.dataset.html !== html) { b.innerHTML = html; b.dataset.html = html; }
     });
     const any = chosen.some(Boolean); $('slotNote').textContent = any ? T.slotUse : T.slotEmpty;
+  }
+
+  // the dress-up page: a turning ball on top, then the ball's pattern and colours, the dot drawing, or the boost
+  let tab = 'ball', spinRaf = 0, paint = 'ink', draft = null;
+  const skin = document.createElement('canvas'); skin.width = 256; skin.height = 128;
+  function stopSpin() { cancelAnimationFrame(spinRaf); spinRaf = 0; }
+  function spinPreview(look) {
+    stopSpin(); drawBall(skin, look); const c = root.querySelector('#preview'); if (!c) return;
+    const t0 = performance.now(), go = now => { drawPreview(c, skin, (now - t0) / 1400); spinRaf = requestAnimationFrame(go); }; spinRaf = requestAnimationFrame(go);
+  }
+  function shop(save) {
+    const look = save.look, hexOf = id => COLORS.find(x => x.id === id).hex; draft ??= [...look.pixels];   // an empty cell shows the ball's own colour
+    const owned = (k, id) => save.owned[k].includes(id), price = p => `<small class="price"><span class="coin"></span>${p}</small>`;
+    const swatches = slot => COLORS.map(c => `<button class="sw" data-color="${c.id}" data-slot="${slot}" aria-pressed="${look[slot] === c.id}" aria-label="${c.name}${owned('colors', c.id) ? '' : `, ${c.price} 코인`}" style="--sw:${c.hex}">${owned('colors', c.id) ? '' : price(c.price)}</button>`).join('');
+    const pal = paintPalette(save), next = nextPaintAt(save);
+    const body = {
+      ball: `<div class="row2 seg"><button data-mode="pattern" aria-pressed="${look.mode === 'pattern'}">${T.modePattern}</button><button data-mode="pixels" aria-pressed="${look.mode === 'pixels'}">${T.modePixels}</button></div>
+        <h3>${T.pattern}</h3><div class="pick">${PATTERNS.map(p => `<button data-pattern="${p.id}" aria-pressed="${look.mode === 'pattern' && look.pattern === p.id}">${p.name}${owned('patterns', p.id) ? '' : price(p.price)}</button>`).join('')}</div>
+        <h3>${T.base}</h3><div class="sws">${swatches('base')}</div><h3>${T.accent}</h3><div class="sws">${swatches('accent')}</div>`,
+      draw: `<div class="dots" id="dots" style="--dw:${DOT_W}">${draft.map((c, i) => `<i data-i="${i}" style="background:${hexOf(c || look.base)}"></i>`).join('')}</div>
+        <div class="sws paint">${pal.map(c => `<button class="sw" data-paint="${c.id}" aria-pressed="${paint === c.id}" aria-label="${c.name}" style="--sw:${c.hex}"></button>`).join('')}<button class="sw eraser" data-paint="" aria-pressed="${paint === ''}" aria-label="${T.eraser}">✕</button></div>
+        <p class="note">${next ? T.paintMore(next - clears(save)) : T.paintAll}</p>
+        <div class="row2"><button id="clearDots">${T.clearAll}</button><button class="go" id="wearDots">${look.mode === 'pixels' && draft.every((c, i) => c === look.pixels[i]) ? T.wearing : T.wear}</button></div>`,
+      boost: `<div class="card flat"><h2>${T.boostName}</h2><p>${T.boostNow(save.boost)}</p>
+        ${save.boost < BOOST_PRICES.length ? `<button class="go" id="buyBoost"><span class="coin"></span> ${T.boostNext(save.boost, BOOST_PRICES[save.boost])}</button>` : `<p>${T.boostMax}</p>`}</div>`,
+    }[tab];
+    $('shop').innerHTML = `<div class="inner">
+      <header><button data-do="closeShop">← ${T.back}</button><span class="purse"><span class="coin"></span>${save.coins}</span></header>
+      <canvas id="preview" class="preview" width="132" height="132" aria-hidden="true"></canvas>
+      <div class="chips tabs" role="tablist">${[['ball', T.tabBall], ['draw', T.tabDraw], ['boost', T.tabBoost]].map(([k, n]) => `<button role="tab" data-tab="${k}" aria-pressed="${tab === k}" aria-selected="${tab === k}">${n}</button>`).join('')}</div>
+      <section>${body}</section></div>`;
+    const S = $('shop'), on = (sel, f) => { for (const b of S.querySelectorAll(sel)) b.addEventListener('click', () => f(b)); };
+    on('[data-do]', b => h[b.dataset.do]());
+    on('[data-tab]', b => { tab = b.dataset.tab; shop(save); });
+    on('[data-mode]', b => h.setLook({ mode: b.dataset.mode }));
+    on('[data-pattern]', b => h.buyOrUse('patterns', b.dataset.pattern));
+    on('[data-color]', b => h.buyOrUse('colors', b.dataset.color, b.dataset.slot));
+    on('[data-paint]', b => { paint = b.dataset.paint; shop(save); });
+    on('#clearDots', () => { draft = Array(DOT_W * DOT_H).fill(null); shop(save); });
+    on('#wearDots', () => h.setLook({ mode: 'pixels', pixels: [...draft] }));
+    on('#buyBoost', () => h.buyBoost());
+    const dots = S.querySelector('#dots');
+    if (dots) {   // paint by touching and dragging over the cells
+      let down = false;
+      const at = e => { const el = document.elementFromPoint(e.clientX, e.clientY); if (el?.parentNode !== dots) return; const i = +el.dataset.i; draft[i] = paint || null; el.style.background = hexOf(paint || look.base); drawBall(skin, { ...look, mode: 'pixels', pixels: draft }); };
+      dots.addEventListener('pointerdown', e => { down = true; dots.setPointerCapture(e.pointerId); at(e); });
+      dots.addEventListener('pointermove', e => { if (down) at(e); });
+      dots.addEventListener('pointerup', () => { down = false; });
+    }
+    $('shop').hidden = false;
+    spinPreview(tab === 'draw' ? { ...look, mode: 'pixels', pixels: draft } : look);
   }
 
   function rest(left, canSkip) {

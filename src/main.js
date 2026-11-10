@@ -10,6 +10,7 @@ import { levelsFor } from './difficulty.js';
 import { loadSave, writeSave, markOpened, reachedOf, isOpen } from './save.js';
 import { createRun, startRun, tickRun, retry, tickRest, skipRest, pauseRun, resumeRun, afterClear, useSlot, setSlots, SKIP_COST } from './run.js';
 import { ownedFor } from './elements.js';
+import { buy, buyBoost, COLORS, PATTERNS, BOOST_PRICES } from './shop.js';
 
 let save = loadSave();
 const tilt = createTilt(), keys = {}, view = createView(document.body), sound = createSound(() => save.opt);
@@ -36,7 +37,7 @@ async function stayAwake() { try { wake = await navigator.wakeLock?.request('mod
 
 function load(id) {
   const ls = levelsFor(save.diff), level = ls.find(l => l.id === id) || ls[0];
-  run = createRun(level, save.diff); view.load(level); theme();
+  run = createRun(level, save.diff); run.boost = save.boost; view.load(level); theme();
 }
 function goHome() {
   mode = 'home'; save = markOpened(save);
@@ -59,6 +60,18 @@ const ui = createUI(document.body, {
   closeSettings() { ui.closeSettings(); if (mode === 'home') goHome(); },
   setOpt(k, v) { save.opt = { ...save.opt, [k]: v }; keep(); if (k === 'dark') theme(); },
   zero() { tilt.calibrate(); ui.toast(T.zeroDone); },
+  openShop() { mode = 'shop'; ui.show('shop', { save }); },
+  closeShop() { goHome(); },
+  setLook(patch) { save = { ...save, look: { ...save.look, ...patch } }; keep(); view.setLook(save.look); ui.show('shop', { save }); },
+  buyOrUse(kind, id, slot) {   // a thing owned is put on; one not owned is bought first, if the coins are there
+    if (!save.owned[kind].includes(id)) {
+      const out = buy(save, kind, id), item = (kind === 'colors' ? COLORS : PATTERNS).find(x => x.id === id);
+      if (!out.ok) return ui.toast(T.needCoins(item.price - save.coins));
+      save = out.save; ui.toast(T.bought(item.name)); sound.ding();
+    }
+    this.setLook(kind === 'patterns' ? { mode: 'pattern', pattern: id } : { [slot]: id });
+  },
+  buyBoost() { const out = buyBoost(save); if (!out.ok) return ui.toast(T.needCoins(BOOST_PRICES[save.boost] - save.coins)); save = out.save; keep(); sound.win(); ui.show('shop', { save }); },
   useSlot(i) { if (run && useSlot(run, i)) sound.coat(); },
   cycleSlot(i) {   // empty → each owned element → empty
     const opts = [null, ...ownedFor(run.level.world)], next = opts[(opts.indexOf(run.slots[i]) + 1) % opts.length], sl = [...run.slots];
@@ -115,7 +128,8 @@ if (shot) {
   if (tok.has('dark')) save.opt.dark = true;
   if (tok.has('normal')) save.diff = 'normal';
   if (tok.has('hard')) save.diff = 'hard';
-  if (shot[1] === 'home') {
+  if (shot[1] === 'shop') { save.coins = 128; save.owned.colors.push('sky', 'grape'); mode = 'shop'; ui.show('shop', { save }); for (const t of ['draw', 'boost']) if (tok.has(t)) document.querySelector(`[data-tab="${t}"]`).click(); }
+  else if (shot[1] === 'home') {
     save.coins = 128; save.prog.easy = { reached: 'w1-10', best: Object.fromEntries(levelsFor('easy').map((l, i) => [l.id, { stars: 1 + i % 3, time: 20 }])) };
     goHome();
   } else {
@@ -131,5 +145,5 @@ if (shot) {
   }
 } else goHome();
 if (new URLSearchParams(location.search).has('test')) window.__tm = { get run() { return run; } };   // read-only peek for tools/smoke.mjs
-theme();
+view.setLook(save.look); theme();
 requestAnimationFrame(frame);
