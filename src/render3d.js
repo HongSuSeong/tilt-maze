@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { FEEL } from './feel.js';
 import { drawBall } from './look.js';
 import { createAura } from './aura.js';
+import { makeDevices } from './devices.js';
 
 const { BW, BH, RIM, R } = FEEL;
 const U = 0.1, WALL_H = 1.0, BAR_TOP = 92, BAR_BOTTOM = 92, VIEW_DEG = 62;
@@ -56,27 +57,6 @@ const ballTex = look => {   // the player's look (see look.js); a pattern shows 
 };
 const LOOK0 = { mode: 'pattern', pattern: 'dots', base: 'coral', accent: 'cream', pixels: [] };
 
-// Liquids in the soft-toy look (lava, puddles, deep water): a glossy jelly of colour `a` with soft round blobs of
-// colour `b` drifting slowly across it and a gloss passing over, smooth low-frequency noise only.
-function jelly(a, b, speed = 1) {
-  return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uA: { value: new THREE.Color(a) }, uB: { value: new THREE.Color(b) }, uS: { value: speed } },
-    vertexShader: `varying vec2 vP; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vP = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }`,
-    fragmentShader: `
-      uniform float uTime, uS; uniform vec3 uA, uB; varying vec2 vP;
-      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      float noise(vec2 p) { vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
-        return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
-      void main() {
-        float t = uTime * uS; vec2 p = vP * 0.9;
-        float n = noise(p + vec2(t * 0.16, t * 0.1)) * 0.6 + noise(p * 1.7 - t * 0.12) * 0.4;
-        vec3 col = mix(uA, uB, smoothstep(0.6, 0.68, n));
-        col += vec3(0.3) * smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(vP.x * 0.7 + vP.y * 0.5 + t * 0.7)) * 0.3;
-        gl_FragColor = vec4(col, 1.0);
-        #include <colorspace_fragment>
-      }`,
-  });
-}
 // a pattern drawn once and repeated over something `n` times along its length (turned a quarter for walls that run down the board)
 function repeated(tex, n, down = false) {
   const t = tex.clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.center.set(0.5, 0.5);
@@ -112,27 +92,17 @@ export function createView(container) {
     coin: new THREE.MeshStandardMaterial({ color: '#FFD34E', metalness: 0.05, roughness: 0.35, emissive: '#E0A100' }),
     ball: new THREE.MeshStandardMaterial({ map: ballTex(LOOK0), roughness: 0.32 }),
     trail: new THREE.MeshBasicMaterial({ color: '#FF9A55', transparent: true, depthWrite: false }),
-    pool: jelly('#8FD3FF', '#E1F5FF', 0.7), poolRim: new THREE.MeshStandardMaterial({ color: '#BFE7FF', roughness: 0.5 }),
     vent: new THREE.MeshStandardMaterial({ color: '#8B5A48', roughness: 0.8 }),
     steam: new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, depthWrite: false }),
     vine: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#6FBF5A'; g.fillRect(0, 0, w, h); g.fillStyle = '#4E9A3E'; for (let i = 0; i < 40; i++) { g.beginPath(); g.ellipse((i * 53) % w, (i * 29) % h, 9, 5, i, 0, 7); g.fill(); } }), roughness: 0.8 }),
     ice: new THREE.MeshStandardMaterial({ color: '#CFEFFF', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.78 }),
     door: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#B07A4F'; g.fillRect(0, 0, w, h); g.fillStyle = '#8A5A36'; for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 4, h); }), roughness: 0.7 }),
-    lava: jelly('#FF7A3C', '#FFC56B'),
-    stone: new THREE.MeshStandardMaterial({ map: canvasTex(256, 256, (g, w, h) => {   // lava gone cold: soft grey pebbles
-      g.fillStyle = '#C2B8B0'; g.fillRect(0, 0, w, h); g.fillStyle = '#AEA39A';
-      for (let i = 0; i < 26; i++) { g.beginPath(); g.ellipse((i * 71) % w, (i * 113) % h, 14 + (i % 3) * 6, 10 + (i % 4) * 4, i, 0, 7); g.fill(); }
-    }), roughness: 0.85 }),
-    rim: new THREE.MeshStandardMaterial({ color: '#E0784A', roughness: 0.6 }),
-    bubble: new THREE.MeshStandardMaterial({ color: '#FFD089', emissive: '#FFB347', emissiveIntensity: 0.4, roughness: 0.3 }),
     post: new THREE.MeshStandardMaterial({ color: '#6B4A35', roughness: 0.8 }),
     slick: new THREE.MeshStandardMaterial({ map: canvasTex(128, 128, (g, w, h) => {   // pale ice with white glints across it
       g.fillStyle = '#CDEEFF'; g.fillRect(0, 0, w, h); g.strokeStyle = '#FFFFFF'; g.lineCap = 'round';
       for (const [x, y, l, lw] of [[20, 30, 40, 6], [70, 20, 22, 4], [40, 90, 34, 5], [96, 76, 18, 3]]) { g.lineWidth = lw; g.beginPath(); g.moveTo(x, y + l * 0.6); g.lineTo(x + l * 0.6, y); g.stroke(); }
     }), roughness: 0.06, metalness: 0.1 }),
     slickRim: new THREE.MeshStandardMaterial({ color: '#BFE7F7', roughness: 0.3 }),
-    deep: jelly('#2F7FB8', '#5BB8F5', 0.5), deepRim: new THREE.MeshStandardMaterial({ color: '#1E5A86', roughness: 0.6 }),
-    fence: new THREE.MeshStandardMaterial({ map: canvasTex(128, 32, (g, w, h) => { g.fillStyle = '#FFD23F'; g.fillRect(0, 0, w, h); g.fillStyle = '#2B2F45'; for (let x = -32; x < w; x += 24) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 12, 0); g.lineTo(x + 24, 0); g.lineTo(x + 12, h); g.fill(); } }), emissive: '#FFB800', emissiveIntensity: 0.25, roughness: 0.5 }),
     zap: new THREE.MeshStandardMaterial({ color: '#FFE98A', emissive: '#FFD23F', emissiveIntensity: 0.6, roughness: 0.6 }),   // a plain lemon floor (the one big bolt sits on top)
     zapOff: new THREE.MeshStandardMaterial({ color: '#CFCCDA', roughness: 0.8 }),   // switched off: grey slate
     boltOn: new THREE.MeshStandardMaterial({ color: '#FF9F1C', emissive: '#FF8A00', emissiveIntensity: 0.6, roughness: 0.5 }), boltOnLine: new THREE.MeshBasicMaterial({ color: '#3B4778' }),
@@ -143,10 +113,9 @@ export function createView(container) {
     }), emissive: '#FFB800', emissiveIntensity: 0 }),
     foe: new THREE.MeshStandardMaterial({ color: '#8A6BFF', emissive: '#5A3FD9', emissiveIntensity: 0.35, roughness: 0.4 }),
     eye: new THREE.MeshBasicMaterial({ color: '#FFFFFF' }),
-    gap: new THREE.MeshBasicMaterial({ color: '#162029' }), gapRim: new THREE.MeshStandardMaterial({ color: '#5B6B78', roughness: 0.7 }),
     thick: new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#A39A90'; g.fillRect(0, 0, w, h); g.strokeStyle = '#7E756C'; g.lineWidth = 4; for (let r = 0; r < 2; r++) for (let x = (r % 2) * 24; x < w; x += 48) g.strokeRect(x, r * h / 2, 48, h / 2); }), roughness: 0.95 }),
   };
-  const WALL_MAT = { wall: mat.wall, crack: mat.crack, vine: mat.vine, ice: mat.ice, door: mat.door, fence: mat.fence, thick: mat.thick };
+  const WALL_MAT = { wall: mat.wall, crack: mat.crack, vine: mat.vine, ice: mat.ice, door: mat.door, thick: mat.thick };
   const board = new THREE.Group(); scene.add(board);
   const ball = new THREE.Mesh(new THREE.SphereGeometry(R * U, 40, 24), mat.ball); ball.castShadow = true;
   const aura = createAura();   // the element the ball wears, and the burst when it is put on
@@ -160,6 +129,7 @@ export function createView(container) {
   const arcGeo = (() => { const sh = new THREE.Shape(); [[0.05, 0.5], [-0.14, 0.02], [0.02, 0.02], [-0.06, -0.5], [0.16, 0.08], [0, 0.08], [0.12, 0.5]].forEach(([x, y], i) => (i ? sh.lineTo(x * 0.8, (y + 0.5) * 0.8) : sh.moveTo(x * 0.8, (y + 0.5) * 0.8))); return new THREE.ShapeGeometry(sh); })();
   let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], pools = [], zaps = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
+  let devices = null;
 
   function paint() {
     const Th = THEME[theme], p = { ...(dark ? PALETTE.dark : PALETTE.light), ...WORLD_TINT[level?.world]?.[dark ? 'dark' : 'light'], ...Th[dark ? 'dark' : 'light'] };
@@ -194,7 +164,8 @@ export function createView(container) {
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(BW * U, BH * U), mat.floor); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; board.add(floor);
     const base = new THREE.Mesh(new RoundedBoxGeometry(BW * U + 0.5, 0.8, BH * U + 0.5, 4, 0.25), mat.base); base.position.y = -0.41; base.receiveShadow = true; board.add(base);
     for (const w of [{ x: 0, y: 0, w: BW, h: RIM }, { x: 0, y: BH - RIM, w: BW, h: RIM }, { x: 0, y: 0, w: RIM, h: BH }, { x: BW - RIM, y: 0, w: RIM, h: BH }]) block(w, mat.wall);
-    walls = lv.walls.map(w => block(w, WALL_MAT[w.kind] || mat.wall));
+    devices = makeDevices({ board, X, Z, U, margin: R * 0.4 * U, round: R * U, box: { x0: RIM / 2, x1: BW - RIM / 2, y0: RIM / 2, y1: BH - RIM / 2 }, dim: !!lv.dim });   // puddles, deep water, lava, fire vents, holes and fences
+    walls = lv.walls.map(w => (w.kind === 'fence' ? devices.fence(w) : block(w, WALL_MAT[w.kind] || mat.wall)));
     coins = lv.coins.map(c => { const m = new THREE.Mesh(coinGeo, mat.coin); m.rotation.z = Math.PI / 2; m.position.set(X(c.x), 0.45, Z(c.y)); m.castShadow = true; board.add(m); return m; });
     // the goal wears a mint ring; trap holes an orange-red one
     const well = (h, ringMat) => {   // a hole: dark inside, a lip, a coloured ring; in a group so a moving trap can carry it
@@ -218,16 +189,11 @@ export function createView(container) {
       if (m.map) { m = m.clone(); m.map = m.map.clone(); m.map.wrapS = m.map.wrapT = THREE.RepeatWrapping; const tile = m === mat.zap ? 0.8 : 1.6; m.map.repeat.set(1 / tile, 1 / tile); m.map.needsUpdate = true; }   // a flat shape's texture coordinates are in board units: one tile each `tile` units
       const g = new THREE.Mesh(roundRect(r.w * U, r.h * U, Math.min(r.w, r.h) * U * 0.25), m); g.rotation.x = -Math.PI / 2; g.position.set(X(r.x + r.w / 2), y, Z(r.y + r.h / 2)); g.receiveShadow = true; board.add(g); return g;
     };
-    pools = (lv.pools || []).map(p => flat(p, mat.pool, 0.01, mat.poolRim));
-    fires = (lv.fires || []).map(f => {   // a vent with a cartoon flame standing on it
-      const g = new THREE.Group(); g.position.set(X(f.x), 0, Z(f.y));
-      const vent = new THREE.Mesh(new THREE.CylinderGeometry(f.r * U * 0.85, f.r * U, 0.16, 20), mat.vent); vent.position.y = 0.08; vent.receiveShadow = true; g.add(vent);
-      const flame = flameShape(f.r * U * 1.25); flame.position.y = 0.12; g.add(flame);   // tall enough to read from above
-      board.add(g); return { g, flame, core: flame, f };
-    });
+    pools = (lv.pools || []).map(p => devices.pool(p));
+    fires = (lv.fires || []).map(f => devices.fire(f));
     zaps = [];
     for (const r of lv.slick || []) flat(r, mat.slick, 0.006, mat.slickRim);
-    deeps = (lv.deep || []).map(r => flat(r, mat.deep, 0.009, mat.deepRim));
+    deeps = (lv.deep || []).map(r => devices.deep(r));
     zaps = (lv.zaps || []).map(z => {   // the floor lit and the floor off, one shown at a time, and little bolts that jump about while it is on
       const sparks = new THREE.Group(); for (let k = 0; k < Math.max(3, Math.round(z.w * z.h / 120)); k++) sparks.add(new THREE.Mesh(arcGeo, mat.arc));
       const bolt = (body, line) => {   // one big bolt lying in the middle of the patch, with a dark edge round it
@@ -238,7 +204,7 @@ export function createView(container) {
       board.add(sparks);
       return { z, on: flat(z, mat.zap, 0.007), off: flat(z, mat.zapOff, 0.007), boltOn: bolt(mat.boltOn, mat.boltOnLine), boltOff: bolt(mat.boltOff, mat.boltOffLine), sparks, t: 0 };
     });
-    for (const g of lv.gaps || []) flat(g, mat.gap, 0.011, mat.gapRim);
+    for (const g of lv.gaps || []) devices.gap(g);
     winds = (lv.winds || []).map(a => {   // stripes that run the way the wind blows
       const t = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 5; for (let y = 8; y < h; y += 21) { g.beginPath(); g.moveTo(8, y); g.lineTo(40, y); g.lineTo(32, y - 6); g.moveTo(40, y); g.lineTo(32, y + 6); g.stroke(); } });
       t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 2.2, 1 / 2.2); t.rotation = -Math.atan2(a.dy, a.dx);   // one arrow tile each 2.2 units
@@ -257,15 +223,7 @@ export function createView(container) {
       for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.05), mat.eye); e.position.set(sx * 0.11, 0.1, 0.33); e.rotation.z = sx * 0.4; g.add(e); }
       board.add(g); return g;
     });
-    lavas = (lv.lava || []).map(L => {   // a dark stone lip, the molten surface inside it, and bubbles that swell and burst
-      const cr = Math.min(L.w, L.h) * U * 0.3;
-      const rim = new THREE.Mesh(roundRect(L.w * U + 0.3, L.h * U + 0.3, cr + 0.15), mat.rim); rim.rotation.x = -Math.PI / 2; rim.position.set(X(L.x + L.w / 2), 0.008, Z(L.y + L.h / 2)); rim.receiveShadow = true; board.add(rim);
-      const m = new THREE.Mesh(roundRect(L.w * U, L.h * U, cr), mat.lava); m.rotation.x = -Math.PI / 2; m.position.set(X(L.x + L.w / 2), 0.014, Z(L.y + L.h / 2)); board.add(m);
-      const bubbles = Array.from({ length: Math.max(2, Math.round(L.w * L.h / 250)) }, (_, k) => {
-        const b = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), mat.bubble); board.add(b); return { b, t: -k * 0.37, L };
-      });
-      return { m, bubbles };
-    });
+    lavas = (lv.lava || []).map(L => devices.lava(L));
     torches = (lv.torches || []).map(t => {   // a post with a bowl; a flame once lit
       const g = new THREE.Group(); g.position.set(X(t.x), 0, Z(t.y));
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.9, 10), mat.post); post.position.y = 0.45; post.castShadow = true; g.add(post);
@@ -301,6 +259,7 @@ export function createView(container) {
   function update(run, tilt, dt, events = []) {
     clock += dt;
     if (`${innerWidth}x${innerHeight}` !== sized) resize();
+    devices?.tick(dt, clock);
     const b = run.ball, k = FEEL.lean * Math.PI / 180;
     board.rotation.x += (tilt.y * k - board.rotation.x) * 0.35; board.rotation.z += (-tilt.x * k - board.rotation.z) * 0.35;
     for (const e of events) {
@@ -318,17 +277,9 @@ export function createView(container) {
     }
     traps.forEach((g, i) => { const at = run.state.trapAt?.[i]; if (at) g.position.set(X(at.x), 0, Z(at.y)); });   // moving traps go where the physics says
     if (lid) lid.visible = run.state.got.size < level.coins.length;
-    lavas.forEach((p, i) => {
-      const cold = run.state.cooled?.has(i); p.m.material = cold ? mat.stone : mat.lava;
-      for (const B of p.bubbles) {   // a bubble swells for a while, bursts, and comes up somewhere else
-        B.t += dt; if (B.t > 1.1 || B.t < 0) { if (B.t > 1.1) B.t = -Math.random() * 0.8; B.b.visible = false; continue; }
-        if (B.t - dt <= 0) B.b.position.set(X(B.L.x + 2 + Math.random() * (B.L.w - 4)), 0.03, Z(B.L.y + 2 + Math.random() * (B.L.h - 4)));
-        B.b.visible = !cold; const k = B.t < 0.95 ? B.t / 0.95 : 1 + (B.t - 0.95) * 6; B.b.scale.set(k, k * 0.6, k);
-      }
-    });
-    mat.lava.uniforms.uTime.value = mat.pool.uniforms.uTime.value = mat.deep.uniforms.uTime.value = clock;
-    deeps.forEach((m, i) => { m.material = run.state.frozen?.has(i) ? mat.slick : mat.deep; });
-    pools.forEach((m, i) => { m.material = run.state.iced?.has(i) ? mat.slick : mat.pool; });   // a frozen puddle is ice
+    lavas.forEach((p, i) => p.set(!!run.state.cooled?.has(i)));   // water cools lava to stone
+    deeps.forEach((d, i) => d.set(!!run.state.frozen?.has(i)));   // ice turns deep water to a bridge
+    pools.forEach((p, i) => p.set(!!run.state.iced?.has(i)));   // a frozen puddle is ice
     switches.forEach((b, i) => { b.material.emissiveIntensity = run.state.powered?.has(i) ? 1.2 : 0; });
     // the electric floor: on for two seconds (lit, bolts jumping), off for two (grey); flickering just before it comes on
     const ph = (run.state.clock || 0) % 4, zapOn = ph < 2, warn = ph > 3.4 && Math.sin(clock * 38) > 0;
@@ -344,10 +295,7 @@ export function createView(container) {
     foes.forEach((g, i) => { const f = run.state.foes?.[i] || level.enemies[i]; g.position.set(X(f.x), 0.36 + 0.05 * Math.sin(clock * 6 + i), Z(f.y)); g.lookAt(ball.position.x, g.position.y, ball.position.z); });
     torches.forEach((t, i) => { t.flame.visible = !!run.state.lit?.has(i); t.flame.scale.set(1, 1 + 0.15 * Math.sin(clock * 11 + i), 1); });
     for (const w of winds) { const sp = Math.hypot(w.a.dx, w.a.dy) / 600 * dt; w.t.offset.x -= sp; }   // the stripes drift with the wind
-    fires.forEach((F, i) => {   // flames sway; put out, only the vent is left
-      F.flame.visible = !run.state.doused?.has(i);
-      const k = 1 + 0.12 * Math.sin(clock * 9 + i) + 0.06 * Math.sin(clock * 23 + i * 2); F.flame.scale.set(1 / Math.sqrt(k), k, 1 / Math.sqrt(k));   // it sways
-    });
+    fires.forEach((F, i) => F.set(!!run.state.doused?.has(i)));   // put out, only the vent is left
     for (let i = puffs.length - 1; i >= 0; i--) {
       const p = puffs[i]; p.t += dt; p.m.position.y += p.v * dt; p.m.scale.setScalar(1 + p.t * 1.5); p.m.material.opacity = Math.max(0, 0.7 * (1 - p.t / 1.4));
       if (p.t > 1.4) { board.remove(p.m); p.m.geometry.dispose(); p.m.material.dispose(); puffs.splice(i, 1); }

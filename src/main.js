@@ -148,7 +148,12 @@ if (shot) {
   for (const d of ['hard', 'hell', 'god']) if (tok.has(d)) save.diff = d;
   for (const t of ['paper', 'toon']) if (tok.has(t)) { save.theme = t; applyTheme(); }
   if (shot[1] === 'shop') { save.coins = 128; save.owned.colors.push('sky', 'grape'); mode = 'shop'; ui.show('shop', { save }); save.found = ['steam']; for (const t of ['draw', 'theme', 'boost', 'book']) if (tok.has(t)) document.querySelector(`[data-tab="${t}"]`).click(); if (tok.has('ask')) document.querySelector('[data-pattern="stars"]').click(); }
-  else if (shot[1] === 'home') {
+  else if (shot[1] === 'devices') {   // every device on one board, to see how they look
+    const lv = { id: 'devices', world: 1, time: 60, start: { x: 20, y: 152 }, hole: { x: 86, y: 150, r: 7.4 }, coins: [], walls: [{ x: 54, y: 125, w: 38, h: 4, kind: 'fence' }],
+      pools: [{ x: 8, y: 8, w: 38, h: 38 }], deep: [{ x: 54, y: 8, w: 38, h: 38 }], lava: [{ x: 8, y: 58, w: 38, h: 38 }], fires: [{ x: 73, y: 77, r: 8 }], gaps: [{ x: 8, y: 108, w: 38, h: 38 }] };
+    run = createRun(lv); view.load(lv); mode = 'shot';
+    if (tok.has('used')) { for (const k of ['iced', 'frozen', 'cooled', 'doused']) run.state[k] = new Set([0]); run.state.broken.add(0); }   // frozen, cooled, put out, switched off
+  } else if (shot[1] === 'home') {
     save.coins = 128; save.prog.easy = { reached: 'w1-10', best: Object.fromEntries(levelsFor('easy').map((l, i) => [l.id, { stars: 1 + i % 3, time: 20 }])) };
     goHome();
   } else {

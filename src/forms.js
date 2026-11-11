@@ -82,3 +82,5 @@ export function buildForm(el) {
   else { const lean = new THREE.Group(); lean.rotation.x = -0.8; lean.add(shape); g.add(lean); g.userData.front = true; }
   g.visible = false; return g;
 }
+// the flame icon on its own, standing leaned toward the camera (for fire pillars and torches)
+export function flameIcon() { const lean = new THREE.Group(); lean.rotation.x = -0.8; lean.add(FORMS.fire()); return lean; }
