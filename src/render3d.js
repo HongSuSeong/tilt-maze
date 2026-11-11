@@ -133,12 +133,8 @@ export function createView(container) {
     slickRim: new THREE.MeshStandardMaterial({ color: '#BFE7F7', roughness: 0.3 }),
     deep: jelly('#2F7FB8', '#5BB8F5', 0.5), deepRim: new THREE.MeshStandardMaterial({ color: '#1E5A86', roughness: 0.6 }),
     fence: new THREE.MeshStandardMaterial({ map: canvasTex(128, 32, (g, w, h) => { g.fillStyle = '#FFD23F'; g.fillRect(0, 0, w, h); g.fillStyle = '#2B2F45'; for (let x = -32; x < w; x += 24) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 12, 0); g.lineTo(x + 24, 0); g.lineTo(x + 12, h); g.fill(); } }), emissive: '#FFB800', emissiveIntensity: 0.25, roughness: 0.5 }),
-    zap: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // rounded lemon tiles (the one big bolt sits on top)
-      g.fillStyle = '#E8D88A'; g.fillRect(0, 0, w, h); g.fillStyle = '#FFE98A'; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 12); g.fill();
-    }), emissive: '#FFD23F', emissiveIntensity: 0.6, roughness: 0.6 }),
-    zapOff: new THREE.MeshStandardMaterial({ map: canvasTex(64, 64, (g, w, h) => {   // the same tiles switched off: grey slate
-      g.fillStyle = '#B7B3C4'; g.fillRect(0, 0, w, h); g.fillStyle = '#CFCCDA'; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 12); g.fill();
-    }), roughness: 0.8 }),
+    zap: new THREE.MeshStandardMaterial({ color: '#FFE98A', emissive: '#FFD23F', emissiveIntensity: 0.6, roughness: 0.6 }),   // a plain lemon floor (the one big bolt sits on top)
+    zapOff: new THREE.MeshStandardMaterial({ color: '#CFCCDA', roughness: 0.8 }),   // switched off: grey slate
     boltOn: new THREE.MeshStandardMaterial({ color: '#FF9F1C', emissive: '#FF8A00', emissiveIntensity: 0.6, roughness: 0.5 }), boltOnLine: new THREE.MeshBasicMaterial({ color: '#3B4778' }),
     boltOff: new THREE.MeshStandardMaterial({ color: '#A29EB3', roughness: 0.8 }), boltOffLine: new THREE.MeshBasicMaterial({ color: '#7E7A92' }),
     arc: new THREE.MeshBasicMaterial({ color: '#FFF27A', side: THREE.DoubleSide }),
