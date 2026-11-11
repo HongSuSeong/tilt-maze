@@ -127,7 +127,7 @@ export function createView(container) {
   const ballEdge = new THREE.Mesh(new THREE.SphereGeometry(R * U, 24, 16), outlineMat); ballEdge.scale.setScalar(1.14); ball.add(ballEdge);   // the cartoon look outlines the ball too
   const boltGeo = (() => { const sh = new THREE.Shape(); [[0.05, 0.5], [-0.14, 0.02], [0.02, 0.02], [-0.06, -0.5], [0.16, 0.08], [0, 0.08], [0.12, 0.5]].forEach(([x, y], i) => (i ? sh.lineTo((x - 0.01) * 1.7, y) : sh.moveTo((x - 0.01) * 1.7, y))); return new THREE.ShapeGeometry(sh); })();
   const arcGeo = (() => { const sh = new THREE.Shape(); [[0.05, 0.5], [-0.14, 0.02], [0.02, 0.02], [-0.06, -0.5], [0.16, 0.08], [0, 0.08], [0.12, 0.5]].forEach(([x, y], i) => (i ? sh.lineTo(x * 0.8, (y + 0.5) * 0.8) : sh.moveTo(x * 0.8, (y + 0.5) * 0.8))); return new THREE.ShapeGeometry(sh); })();
-  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], pools = [], zaps = [], switches = [], foes = [], winds = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
+  let level = null, walls = [], coins = [], bits = [], fires = [], puffs = [], lavas = [], torches = [], deeps = [], pools = [], zaps = [], switches = [], foes = [], traps = [], lid = null, trailI = 0, dark = false, clock = 0;
   const q = new THREE.Quaternion(), axis = new THREE.Vector3();
   let devices = null;
 
@@ -156,7 +156,7 @@ export function createView(container) {
 
   function clear() {
     for (const o of [...board.children]) { board.remove(o); if (o !== ball && !trail.some(t => t.m === o) && o.geometry !== coinGeo && o.geometry !== bitGeo) o.geometry?.dispose(); }
-    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = []; deeps = []; pools = []; switches = []; foes = []; winds = []; traps = []; lid = null;
+    walls = []; coins = []; bits = []; fires = []; puffs = []; lavas = []; torches = []; deeps = []; pools = []; switches = []; foes = []; traps = []; lid = null;
   }
 
   function load(lv) {
@@ -205,12 +205,7 @@ export function createView(container) {
       return { z, on: flat(z, mat.zap, 0.007), off: flat(z, mat.zapOff, 0.007), boltOn: bolt(mat.boltOn, mat.boltOnLine), boltOff: bolt(mat.boltOff, mat.boltOffLine), sparks, t: 0 };
     });
     for (const g of lv.gaps || []) devices.gap(g);
-    winds = (lv.winds || []).map(a => {   // stripes that run the way the wind blows
-      const t = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 5; for (let y = 8; y < h; y += 21) { g.beginPath(); g.moveTo(8, y); g.lineTo(40, y); g.lineTo(32, y - 6); g.moveTo(40, y); g.lineTo(32, y + 6); g.stroke(); } });
-      t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 2.2, 1 / 2.2); t.rotation = -Math.atan2(a.dy, a.dx);   // one arrow tile each 2.2 units
-      const m = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.75, depthWrite: false, color: "#5FA88A" });
-      flat(a, m, 0.013); return { t, a };
-    });
+    for (const a of lv.winds || []) devices.wind(a);
     switches = (lv.switches || []).map(w => {   // a round button with a bolt on top, on a short base; it lights when powered
       const g = new THREE.Group(); g.position.set(X(w.x), 0, Z(w.y));
       const base = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.12, 24), mat.post); base.position.y = 0.06; base.receiveShadow = true; g.add(base);
@@ -294,7 +289,6 @@ export function createView(container) {
     }
     foes.forEach((g, i) => { const f = run.state.foes?.[i] || level.enemies[i]; g.position.set(X(f.x), 0.36 + 0.05 * Math.sin(clock * 6 + i), Z(f.y)); g.lookAt(ball.position.x, g.position.y, ball.position.z); });
     torches.forEach((t, i) => { t.flame.visible = !!run.state.lit?.has(i); t.flame.scale.set(1, 1 + 0.15 * Math.sin(clock * 11 + i), 1); });
-    for (const w of winds) { const sp = Math.hypot(w.a.dx, w.a.dy) / 600 * dt; w.t.offset.x -= sp; }   // the stripes drift with the wind
     fires.forEach((F, i) => F.set(!!run.state.doused?.has(i)));   // put out, only the vent is left
     for (let i = puffs.length - 1; i >= 0; i--) {
       const p = puffs[i]; p.t += dt; p.m.position.y += p.v * dt; p.m.scale.setScalar(1 + p.t * 1.5); p.m.material.opacity = Math.max(0, 0.7 * (1 - p.t / 1.4));

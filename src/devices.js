@@ -1,4 +1,4 @@
-// How the board's devices look: puddles, deep water, lava, fire vents, holes in the floor and electric fences. Each is
+// How the board's devices look: puddles, deep water, lava, fire vents, holes in the floor, electric fences and wind. Each is
 // drawn with an uneven outline the size of its rectangle, so it reads as the real thing; what they do is in physics.js.
 import * as THREE from 'three';
 import { flameIcon } from './forms.js';
@@ -140,6 +140,26 @@ export function makeDevices({ board, X, Z, U, margin = 0, round = 0, box, dim = 
       for (let i = 0; i < signs; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42), basic('#FFFFFF', { map: TEX.sign(), transparent: true, side: THREE.DoubleSide })); m.position.copy(at(-L / 2 + (i + 0.5) * L / signs, 0.62)); m.rotation.x = -0.5; g.add(m); }
       ticks.push((dt, c) => wire.material.color.setHSL(0.15, 1, 0.6 + 0.3 * Math.abs(Math.sin(c * 13 + w.x))));
       g.position.set(X(w.x + w.w / 2), 0, Z(w.y + w.h / 2)); board.add(g); return g;
+    },
+    wind(a) {   // where the wind blows: a pale band, with white streaks and leaves carried along it, faster the stronger it is
+      const w = a.w * U, h = a.h * U, g = group(a.x + a.w / 2, a.y + a.h / 2), ang = Math.atan2(a.dy, a.dx), dx = Math.cos(ang), dz = Math.sin(ang), speed = Math.hypot(a.dx, a.dy) / 90;
+      lay(g, edge(a, seeds++, { wob: 0.02, sq: 6 }), basic('#EAF6FF', { transparent: true, opacity: 0.35, depthWrite: false }), 0.005);
+      const streak = L => { const W = 0.06, top = [], bot = []; for (let i = 0; i <= 16; i++) { const u = i / 16, x = (u - 0.5) * L, y = Math.sin(u * Math.PI * 1.4) * W * 1.5, t = W * u ** 0.9 * Math.min(1, (1 - u) * 6) ** 0.5; top.push(new THREE.Vector2(x, y + t)); bot.unshift(new THREE.Vector2(x, y - t)); } return new THREE.ShapeGeometry(new THREE.Shape([...top, ...bot])); };   // thin tail, round head toward the wind
+      const leaf = once('leafGeo', () => new THREE.ShapeGeometry(new THREE.Shape([[0.2, 0], [0.09, 0.09], [-0.12, 0.08], [-0.2, 0], [-0.12, -0.08], [0.09, -0.09]].map(([x, y]) => new THREE.Vector2(x, y)))));
+      const bits = Array.from({ length: Math.max(4, Math.min(28, Math.round(w * h * 0.6))) }, (_, i) => {
+        const leafy = i % 3 !== 0; let m;
+        if (leafy) m = new THREE.Mesh(leaf, std(['#7BC86C', '#A8D86E', '#F2C14E', '#E8935A'][i % 4], { transparent: true, side: THREE.DoubleSide }));
+        else { const geo = streak(0.9 + R() * 0.8), line = new THREE.Mesh(geo, basic('#7FB3CC', { transparent: true, depthWrite: false })); m = new THREE.Mesh(geo, basic('#FFFFFF', { transparent: true, depthWrite: false })); line.scale.set(1.04, 1.7, 1); line.position.z = -0.004; m.add(line); }
+        m.rotation.order = 'YXZ'; m.rotation.set(-Math.PI / 2, -ang, 0); g.add(m);
+        return { m, leafy, top: leafy ? 0.95 : 0.6, t: R(), life: 0.9 + R() * 0.9, x: (R() - 0.5) * w, z: (R() - 0.5) * h, spin: R() * 6 };
+      });
+      ticks.push((dt, c) => { for (const b of bits) {
+        const v = speed * dt * (b.leafy ? 0.8 : 1); b.t += dt / b.life; b.x += dx * v; b.z += dz * v;
+        if (b.t > 1 || Math.abs(b.x) > w / 2 || Math.abs(b.z) > h / 2) { b.t = 0; b.x = (R() - 0.5) * w; b.z = (R() - 0.5) * h; }
+        b.m.position.set(b.x, b.leafy ? 0.08 + 0.06 * Math.abs(Math.sin(c * 4 + b.spin)) : 0.14, b.z);
+        b.m.material.opacity = b.top * Math.min(1, 2.5 * Math.sin(Math.PI * b.t)); for (const k of b.m.children) k.material.opacity = b.m.material.opacity;
+        if (b.leafy) b.m.rotation.set(-Math.PI / 2 + 0.5 * Math.sin(c * 5 + b.spin), -ang + c * 3 + b.spin, 0);   // it tumbles as it flies
+      } });
     },
     tick(dt, clock) { TEX.lava().offset.x += 0.03 * dt; TEX.lava().offset.y += 0.012 * dt; TEX.wave().offset.x += 0.05 * dt; TEX.wave().offset.y += 0.02 * dt; for (const t of ticks) t(dt, clock); },
   };
