@@ -32,11 +32,11 @@ function canvasTex(w, h, paint) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
-// The three looks the shop sells: the soft toy (rounded white blocks, a dotted floor), cut paper (flat yellow paper
+// The three looks the shop sells: the soft toy (rounded white blocks, a plain floor), cut paper (flat yellow paper
 // walls with crisp edges and long shadows, a fibred floor) and the bold cartoon (purple blocks with dark outlines, a
 // checked floor). Each world still tints the floor.
 const THEME = {
-  toy: { light: {}, dark: {}, floor: 'dots', round: 0.22, outline: null },
+  toy: { light: {}, dark: {}, floor: 'plain', round: 0.22, outline: null },
   paper: { light: { wall: '#FFE45C', base: '#FFFFFF' }, dark: { wall: '#B8A24A', base: '#2C2C2C' }, floor: 'fibre', round: 0.03, outline: null, sun: [-7, 9, 3] },
   toon: { light: { wall: '#7B5CFF', base: '#FFFFFF' }, dark: { wall: '#5A3FD9', base: '#1C1830' }, floor: 'check', round: 0.15, outline: '#2B1B5A' },
 };

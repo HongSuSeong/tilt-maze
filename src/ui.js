@@ -3,7 +3,7 @@
 import { T } from './text.js';
 import { DIFFS, BUILT, levelsFor } from './difficulty.js';
 import { isOpen, reachedOf } from './save.js';
-import { ELEMENTS, FUSIONS, ownedFor } from './elements.js';
+import { ELEMENTS, FUSIONS, ownedFor, RECOMMENDS } from './elements.js';
 import { canFuse } from './run.js';
 import { COLORS, PATTERNS, THEMES, BOOST_PRICES, paintPalette, nextPaintAt, clears } from './shop.js';
 import { drawBall, drawPreview, DOT_W, DOT_H } from './look.js';
@@ -94,7 +94,7 @@ export function createUI(root, h) {
         bars(true); label(d.level);
         // small, so the board stays in view while the elements are chosen: a name, a line of advice, then the slots beside Start
         card(`<h2>${esc(d.level.name)}</h2><p>${esc(d.level.hint || (d.level.lock ? T.lockHint : d.level.traps?.some(t => t.to) ? T.moveHint : T.readyHold))}</p>
-          ${equip(d.level, d.slots)}<button class="go" data-do="start">${T.start}</button>`);
+          ${equip(d.level, d.slots, d.diff)}<button class="go" data-do="start">${T.start}</button>`);
         $('card').classList.add('compact');
         for (const b of root.querySelectorAll('[data-pick]')) b.addEventListener('click', () => h.pickElement(b.dataset.pick));
         slots(d.slots, null, [0, 0]);
@@ -122,13 +122,15 @@ export function createUI(root, h) {
     }
   }
 
-  // the elements on the ready card, all in a row: a tap puts one on (its slot number shows), a second tap takes it off
-  function equip(level, chosen) {
+  // the elements on the ready card, all in a row: a tap puts one on (its slot number shows), a second tap takes it off.
+  // On easy and normal what the stage needs is marked as recommended.
+  function equip(level, chosen, diff) {
+    const rec = el => RECOMMENDS.includes(diff) && (level.kit || []).includes(el);
     const owned = ownedFor(level.world);
     if (!owned.length) return '';
     return `<p class="note">${T.equip}</p><div class="tray" role="group" aria-label="${T.equip}">${owned.map(el => {
       const at = chosen.indexOf(el);
-      return `<button data-pick="${el}" aria-pressed="${at >= 0}" aria-label="${ELEMENTS[el].name}${at >= 0 ? `, 칸 ${at + 1}` : ''}">${at >= 0 ? `<i class="nth">${at + 1}</i>` : ''}${ICON[el]}<span>${ELEMENTS[el].name}</span></button>`;
+      return `<button data-pick="${el}" aria-pressed="${at >= 0}" aria-label="${ELEMENTS[el].name}${at >= 0 ? `, 칸 ${at + 1}` : ''}">${at >= 0 ? `<i class="nth">${at + 1}</i>` : ''}${rec(el) ? `<i class="rec">${T.recommend}</i>` : ''}${ICON[el]}<span>${ELEMENTS[el].name}</span></button>`;
     }).join('')}</div>`;
   }
   // the slots in the dock: what each holds, how long the coat (or the fusion of both) has left, how long until it can

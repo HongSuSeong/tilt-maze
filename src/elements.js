@@ -18,8 +18,13 @@ export const fusionOf = (a, b) => Object.keys(FUSIONS).find(f => { const [x, y] 
 export const WORLD_ELEMENT = { 2: 'water', 3: 'fire', 4: 'ice', 5: 'spark', 6: 'stone', 7: 'gas' };
 
 export const ownedFor = world => Object.entries(WORLD_ELEMENT).filter(([w]) => +w <= world).map(([, e]) => e);
-// the last two gained, so the newest is always worn in its own world
-export function defaultSlots(level) { const o = ownedFor(level.world).slice(-2); return [o[0] ?? null, o[1] ?? null]; }
+// What the slots start with, before the player changes them. On easy and normal, what the stage needs (its kit), so the
+// player sees the way and learns it; from hard on nothing, since choosing is part of the puzzle there.
+export const RECOMMENDS = ['easy', 'normal'];
+export function defaultSlots(level, diff = 'easy') {
+  const k = RECOMMENDS.includes(diff) ? level.kit || [] : [];
+  return [k[0] ?? null, k[1] ?? null];
+}
 
 // Picking before a stage: a tap puts the element in the free slot, a second tap takes it out; with both full the
 // older one makes room.

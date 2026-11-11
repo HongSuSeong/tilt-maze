@@ -80,6 +80,7 @@ button.go:active:not(:disabled) { box-shadow: 0 2px 0 var(--go-edge); }
 .tray button { position: relative; min-height: 58px; padding: 4px 0; display: grid; place-items: center; gap: 0; font-size: 12px; background: var(--soft); box-shadow: 0 3px 0 var(--edge); opacity: .7; }
 .tray button svg { width: 24px; height: 24px; }
 .tray button[aria-pressed="true"] { background: var(--card); opacity: 1; outline: 3px solid var(--go); outline-offset: 1px; }
+.tray .rec { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); padding: 0 6px; border-radius: 8px; background: var(--coin); color: #5A4300; font-style: normal; font-size: 10px; line-height: 15px; white-space: nowrap; }
 .tray .nth { position: absolute; top: -6px; right: -4px; width: 18px; height: 18px; border-radius: 50%; background: var(--go); color: var(--go-ink); font-style: normal; font-size: 12px; line-height: 18px; text-align: center; }
 .card.compact .go-row { display: flex; gap: 10px; align-items: stretch; }
 .card.compact .go-row .equip { flex: 0 0 auto; gap: 8px; }

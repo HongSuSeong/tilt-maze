@@ -57,20 +57,22 @@ try {
   await page.reload();
   check(await page.getByRole('button', { name: /이어하기 · 불의 협곡 1/ }).isVisible(), 'after the waterside comes the fire canyon');
   await page.getByRole('button', { name: /이어하기/ }).click();
-  await page.getByRole('button', { name: /^물/ }).click();
-  check(await page.evaluate(() => JSON.stringify(window.__tm.run.slots)) === '[null,"fire"]', 'a tap on a worn element takes it off');
-  await page.getByRole('button', { name: /^물/ }).click();
-  check(await page.evaluate(() => JSON.stringify(window.__tm.run.slots)) === '["water","fire"]', 'and another puts it back');
+  check(await page.evaluate(() => JSON.stringify(window.__tm.run.slots)) === '["fire",null]', 'on easy the slots start with what the stage needs');
+  check(await page.locator('[data-pick="fire"] .rec').count() === 1 && await page.locator('[data-pick="water"] .rec').count() === 0, 'and it is marked as recommended');
+  await page.getByRole('button', { name: /^불/ }).click();
+  check(await page.evaluate(() => JSON.stringify(window.__tm.run.slots)) === '[null,null]', 'a tap on a worn element takes it off');
+  await page.getByRole('button', { name: /^물/ }).click(); await page.getByRole('button', { name: /^불/ }).click();
+  check(await page.evaluate(() => JSON.stringify(window.__tm.run.slots)) === '["water","fire"]', 'and taps put them on in turn');
   await page.getByRole('button', { name: '시작' }).click();
   await page.locator('#slot1').dispatchEvent('pointerdown');
   check(await page.evaluate(() => window.__tm.run.coat?.el) === 'fire', 'the second slot coats the ball in fire');
-  // the fire canyon cleared: the ice field, with fire and ice worn by default
+  // the fire canyon cleared: the ice field, with its ice put on for it
   await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('tilt-maze:v1')); for (let i = 1; i <= 10; i++) s.prog.easy.best[`w3-${i}`] = { stars: 1, time: 40 }; localStorage.setItem('tilt-maze:v1', JSON.stringify(s)); });
   await page.reload();
   check(await page.getByRole('button', { name: /이어하기 · 얼음 들판 1/ }).isVisible(), 'after the fire canyon comes the ice field');
   await page.getByRole('button', { name: /이어하기/ }).click(); await page.getByRole('button', { name: '시작' }).click();
-  await page.locator('#slot1').dispatchEvent('pointerdown');
-  check(await page.evaluate(() => window.__tm.run.coat?.el) === 'ice', 'the new element sits in the second slot');
+  await page.locator('#slot0').dispatchEvent('pointerdown');
+  check(await page.evaluate(() => window.__tm.run.coat?.el) === 'ice', 'the new element is put on for its world');
   await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('tilt-maze:v1')); for (let i = 1; i <= 10; i++) s.prog.easy.best[`w4-${i}`] = { stars: 1, time: 40 }; localStorage.setItem('tilt-maze:v1', JSON.stringify(s)); });
   await page.reload();
   check(await page.getByRole('button', { name: /이어하기 · 번개 공장 1/ }).isVisible(), 'after the ice field comes the spark works');

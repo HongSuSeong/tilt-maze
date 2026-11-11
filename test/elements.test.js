@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ELEMENTS, ownedFor, defaultSlots, toggleElement } from '../src/elements.js';
 import { createRun, startRun, tickRun, useSlot, setSlots, retry } from '../src/run.js';
 
-const L = (o = {}) => ({ id: 'x', world: 2, time: 60, start: { x: 30, y: 80 }, hole: { x: 90, y: 150, r: 7.4 }, walls: [], coins: [], fires: [{ x: 75, y: 80, r: 5 }], ...o });
+const L = (o = {}) => ({ id: 'x', world: 2, kit: ['water'], time: 60, start: { x: 30, y: 80 }, hole: { x: 90, y: 150, r: 7.4 }, walls: [], coins: [], fires: [{ x: 75, y: 80, r: 5 }], ...o });
 const play = (r, tilt, sec) => { for (let t = 0; t < sec; t += 1 / 60) tickRun(r, tilt, 1 / 60, 1); };
 const flat = { x: 0, y: 0 };
 
@@ -14,7 +14,14 @@ describe('elements', () => {
   it('electricity lasts five seconds too', () => expect(ELEMENTS.spark).toMatchObject({ name: '전기', dur: 5, cool: 3 }));
   it('ice lasts five seconds too', () => expect(ELEMENTS.ice).toMatchObject({ name: '얼음', dur: 5, cool: 3 }));
   it('fire lasts five seconds too', () => expect(ELEMENTS.fire).toMatchObject({ name: '불', dur: 5, cool: 3 }));
-  it('the slots fill with what is owned', () => { expect(defaultSlots({ world: 1 })).toEqual([null, null]); expect(defaultSlots({ world: 2 })).toEqual(['water', null]); expect(defaultSlots({ world: 3 })).toEqual(['water', 'fire']); expect(defaultSlots({ world: 4 })).toEqual(['fire', 'ice']); });
+  it('on easy and normal the slots start with what the stage needs', () => {
+    expect(defaultSlots({ world: 1 })).toEqual([null, null]);
+    expect(defaultSlots({ world: 2, kit: ['water'] })).toEqual(['water', null]);
+    expect(defaultSlots({ world: 8, kit: ['fire', 'gas'] }, 'normal')).toEqual(['fire', 'gas']);
+  });
+  it('from hard on they start empty: choosing is the puzzle', () => {
+    for (const d of ['hard', 'hell', 'god']) expect(defaultSlots({ world: 8, kit: ['fire', 'gas'] }, d)).toEqual([null, null]);
+  });
   it('a slot coats the ball for five seconds, then rests three', () => {
     const r = createRun(L()); startRun(r);
     expect(useSlot(r, 0)).toBe(true); expect(r.coat).toMatchObject({ el: 'water', left: 5 });

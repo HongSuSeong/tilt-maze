@@ -9,7 +9,7 @@ export const T = {
   lockHint: '코인을 모두 모아야 구멍이 열려요', moveHint: '움직이는 함정 구멍을 조심하세요',
   readyHold: '폰을 바닥과 수평으로 들고 시작을 누르세요',
   start: '시작', left: '남은 시간',
-  slotEmpty: '원소는 물의 세계부터', slotFuse: '반짝이는 칸을 누르면 합체해요', fusedNow: name => `${name}!`,
+  slotEmpty: '원소는 물의 세계부터', recommend: '추천', slotFuse: '반짝이는 칸을 누르면 합체해요', fusedNow: name => `${name}!`,
   tabBook: '도감', bookNote: '원소를 두른 채 다른 칸을 누르면 합체해요. 처음 찾으면 코인 10개', bookHint: el => `${el}${(el.charCodeAt(el.length - 1) - 0xAC00) % 28 ? '과' : '와'} 무언가를 섞으면…`,
   found: name => `새 합체 발견: ${name}! 코인 +10`, slotUse: '칸을 누르면 공이 원소를 둘러요', equip: '쓸 원소 두 개를 누르세요', none: '비움', pause: '일시 정지',
   resume: '계속하기', retry: '다시 하기', home: '처음 화면으로',

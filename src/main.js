@@ -57,7 +57,7 @@ function goHome() {
   if (!unlockAll && !isOpen(save, save.diff)) save = { ...save, diff: 'easy' };   // a difficulty chosen while unlocked is not kept open
   keep(); if (!run) load(reachedOf(save, save.diff)); ui.show('home', { save, notice, unlock: unlockAll });
 }
-function ready() { mode = 'ready'; ui.show('ready', { level: run.level, slots: run.slots }); ui.hud(run); }
+function ready() { mode = 'ready'; ui.show('ready', { level: run.level, slots: run.slots, diff: save.diff }); ui.hud(run); }
 
 const ui = createUI(document.body, {
   async play(id) { await unlock(); stayAwake(); load(id); ready(); },
