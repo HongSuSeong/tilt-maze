@@ -84,4 +84,13 @@ describe('validateLevel', () => {
     const walls = [{ x: 3, y: 80, w: 40, h: 6, kind: 'wall' }, { x: 57, y: 80, w: 40, h: 6, kind: 'wall' }];
     expect(validateLevel(base({ walls, traps: [{ x: 50, y: 83, r: 7, to: { x: 50, y: 60 }, period: 3 }] }))).toEqual([]);
   });
+  it('a moving trap that runs the length of the only way cannot be passed', () => {
+    // a corridor across the board; the trap goes from one end of it to the other, so the ball would have to get by it
+    const walls = [{ x: 3, y: 70, w: 94, h: 6, kind: 'wall' }, { x: 3, y: 88, w: 94, h: 6, kind: 'wall' }];
+    const lv = base({ walls, start: { x: 12, y: 82 }, hole: { x: 88, y: 82, r: 7.4 } });
+    expect(validateLevel({ ...lv, traps: [{ x: 30, y: 82, r: 4.5, to: { x: 70, y: 82 }, period: 4 }] })).toContain('움직이는 함정 0: 지나갈 틈이 없음');
+    // the same corridor with the trap poking in from a pocket beside it: it can be waited out
+    const pocket = { ...lv, walls: [{ x: 3, y: 70, w: 44, h: 6, kind: 'wall' }, { x: 53, y: 70, w: 44, h: 6, kind: 'wall' }, { x: 41, y: 52, w: 6, h: 18, kind: 'wall' }, { x: 53, y: 52, w: 6, h: 18, kind: 'wall' }, { x: 41, y: 46, w: 18, h: 6, kind: 'wall' }, walls[1]] };
+    expect(validateLevel({ ...pocket, traps: [{ x: 50, y: 60, r: 4.5, to: { x: 50, y: 82 }, period: 4 }] })).toEqual([]);
+  });
 });

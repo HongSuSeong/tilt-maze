@@ -107,6 +107,12 @@ export function validateLevel(level, { fuse = true, trace = true } = {}) {
     }
     if (best < RUN_NEEDED) err.push(`금 간 벽 ${i}: 달릴 거리 ${Math.round(best)} (${RUN_NEEDED} 필요)`);
   });
+  // a moving trap is passed by waiting for it at one end of its run: there it must leave the way to everything clear
+  if (!level.parked) traps.forEach((t, i) => {
+    if (!t.to) return;
+    const parked = at => validateLevel({ ...level, parked: true, traps: [...traps.filter(u => !u.to), { x: at.x, y: at.y, r: t.r }] }, { fuse, trace }).length > 0;
+    if (parked(t) && parked(t.to)) err.push(`움직이는 함정 ${i}: 지나갈 틈이 없음`);
+  });
   return err;
 }
 

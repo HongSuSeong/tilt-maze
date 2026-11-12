@@ -117,30 +117,25 @@ export function generate(world, index, diff = 'hard') {
   const nTraps = Math.min(deadEnds.length, 2 + Math.floor(world / 2)), trapCells = deadEnds.slice(0, nTraps);
   const traps = trapCells.map(c => ({ ...center(c), r: 4.5 }));
   if (!traps.length) { const c = [...Array(N).keys()].find(c => !onPath.has(c)) ?? path[1]; traps.push({ ...center(c), r: 4.5 }); trapCells.push(c); }
+  // hell and god: traps that come out of a dead end onto the way and go back (two to four), timed to be passed: the ball
+  // waits beside the way until the trap is back in its pit. One that ran along the way could never be got by.
+  const pits = [];
+  if (diff === 'hell' || diff === 'god') {
+    const want = 2 + Math.floor(world / 4), side = deadEnds.map(s => ({ s, p: links(s)[0] }));
+    const onWay = side.filter(({ p }, i) => { const k = path.indexOf(p); return k >= 1 && k <= L - 2 && !used.has(k) && side.findIndex(d => d.p === p) === i; }).sort((a, b) => path.indexOf(a.p) - path.indexOf(b.p));
+    for (let k = 0; k < want && k < onWay.length; k++) pits.push(onWay[Math.floor(k * onWay.length / Math.min(want, onWay.length))]);
+    for (const d of side) if (pits.length < 2 && !pits.includes(d) && !onPath.has(d.p)) pits.push(d);   // few on the way: one peeks out off it
+  }
+  const pitCells = pits.map(d => d.s);
+  for (let k = traps.length - 1; k >= 0; k--) if (pitCells.includes(trapCells[k])) traps.splice(k, 1);   // that pit's trap is the one that moves
   if (diff !== 'easy' && (world === 5 || world === 10)) {
-    const lair = deadEnds.filter(c => !trapCells.includes(c)).concat([path[Math.floor(L * 0.75)]]);
+    const lair = deadEnds.filter(c => !trapCells.includes(c) && !pitCells.includes(c)).concat([path[Math.floor(L * 0.75)]]);
     o.enemies.push(...lair.slice(0, world === 10 ? 2 : 1).map(c => ({ ...center(c), speed: 22 })));
   }
-  const coins = [...Array(N).keys()].filter(c => !onPath.has(c) && !trapCells.includes(c)).filter(() => rand() < 0.35).slice(0, 4).map(center);
+  const coins = [...Array(N).keys()].filter(c => !onPath.has(c) && !trapCells.includes(c) && !pitCells.includes(c)).filter(() => rand() < 0.35).slice(0, 4).map(center);
   coins.push(center(path[Math.floor(L / 2)]));
   if (diff === 'god') for (let k = 1; coins.length < 3; k++) coins.push(center(path[Math.floor(L * k / 4)]));   // something to gather before the hole opens
-
-  // hell and god: traps that go back and forth along straight stretches of the way (two to four), timed to be passed
-  if (diff !== 'hard') {
-    const dir = k => path[k + 1] - path[k], runs = [];
-    for (let k = 1; k < L - 2; ) {
-      let m = k; while (m + 1 < L - 1 && dir(m) === dir(k)) m++;
-      if (m - k >= 1 && ![...Array(m - k + 1).keys()].some(j => used.has(k + j))) runs.push([k, m]);
-      k = m + 1;
-    }
-    runs.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]));
-    const want = 2 + Math.floor(world / 4);
-    for (const [a, b] of runs.slice(0, want)) traps.push({ ...center(path[a]), r: 4.5, to: center(path[b]), period: 3 + rand() * 1.6 });
-    for (let c = 0; traps.filter(t => t.to).length < 2 && c < N; c++) {   // few straight stretches: set one going off the way
-      const n = links(c).find(n => !onPath.has(c) && !onPath.has(n) && !trapCells.includes(c) && !trapCells.includes(n));
-      if (n != null) traps.push({ ...center(c), r: 4.5, to: center(n), period: 3.5 });
-    }
-  }
+  for (const { s, p } of pits) traps.push({ ...center(s), r: 4.5, to: center(p), period: 3 + rand() * 1.6 });
 
   if (diff === 'easy') {   // each stage of a mixed world gets its own extra: wind, the electric floor, ice or puddles, in turn; enemies late on
     const extra = index % 4, cells = some(3);
